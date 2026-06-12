@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Babylon.js 11v11 Hardcore Tactical Soccer - Maximum AI Version</title>
+  <title>Babylon.js 11v11 Realistic Tactical Soccer</title>
   <style>
     html, body {
       overflow: hidden;
@@ -24,13 +24,13 @@
       left: 20px;
       color: white;
       font-family: 'Malgun Gothic', sans-serif;
-      background: rgba(0, 0, 0, 0.75);
+      background: rgba(0, 0, 0, 0.8);
       padding: 15px 20px;
       border-radius: 10px;
       pointer-events: none;
       line-height: 1.6;
       z-index: 10;
-      border: 1px solid #ff4444;
+      border: 1px solid #1976d2;
     }
     #scoreboard {
       position: absolute;
@@ -41,18 +41,18 @@
       font-family: 'Arial', sans-serif;
       font-size: 24px;
       font-weight: bold;
-      background: rgba(255, 255, 255, 0.9);
-      padding: 10px 30px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 10px 40px;
       border-radius: 30px;
       border: 2px solid #ccc;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
       pointer-events: none;
       z-index: 10;
     }
-    .score-team { display: inline-block; width: 80px; text-align: center; }
-    #home-name { color: #d32f2f; } 
-    #away-name { color: #1976d2; } 
-    #score-text { font-size: 28px; color: #222; margin: 0 10px; }
+    .score-team { display: inline-block; width: 90px; text-align: center; }
+    #home-name { color: #1976d2; } 
+    #away-name { color: #d32f2f; } 
+    #score-text { font-size: 28px; color: #222; margin: 0 15px; }
 
     #power-bar-container {
       margin-top: 10px;
@@ -75,9 +75,9 @@
       transform: translate(-50%, -50%);
       color: #ffeb3b;
       font-family: 'Arial Black', sans-serif;
-      font-size: 72px;
+      font-size: 84px;
       font-weight: bold;
-      text-shadow: 4px 4px 0px #000, -4px -4px 0px #000, 4px -4px 0px #000, -4px 4px 0px #000;
+      text-shadow: 5px 5px 0px #000, -5px -5px 0px #000, 5px -5px 0px #000, -5px 5px 0px #000;
       display: none;
       pointer-events: none;
       z-index: 20;
@@ -95,12 +95,11 @@
 <body>
 
   <div id="ui-container">
-    🔥 <b>하드코어 전술 매치 시스템 (v3.0 - 최상위 전술 AI 엔진)</b><br>
-    • AI 지능 레벨: <span class="highlight">MAXIMUM (프로 등급 이상)</span><br>
-    • 공간 예측: 유저의 이동 가속도를 파악하여 길목을 사전 차단<br>
-    • 협력 수비: 지역 방어(Zone Radius) 기반 복귀 및 근접 시 유기적 압박<br>
-    • 조작: 화살표 키 / E (대시) / D (D슛 게이지 충전) / <span class="highlight">S (아군 방향 패스)</span><br>
-    • 수비: 상대 공 소유 시 가까이 접근하여 <span class="system-ready">Spacebar</span> 연타로 뺏기
+    ⚽ <b>리얼리스틱 11v11 전술 매치 시스템 (v4.0)</b><br>
+    • 스케일: <span class="system-ready">경기장 및 선수 크기 대폭 상향</span><br>
+    • 템포: 무작정 뛰는 속도 조절, 리얼한 전술 빌드업 페이스<br>
+    • 조작: 화살표 키 / E (대시) / D (D슛 차징) / <span class="highlight">S (정면 아군 패스)</span><br>
+    • 수비: 상대 마크맨 근접 시 <span class="system-ready">Spacebar</span> 연타로 밀착 태클 가로채기
     <div id="power-bar-container">
       <div id="power-bar"></div>
     </div>
@@ -119,78 +118,123 @@
   <script type="module">
     const { Engine, Scene, FreeCamera, Vector3, HemisphericLight, DirectionalLight, MeshBuilder, StandardMaterial, Color3, DynamicTexture } = BABYLON;
 
-    const PLAYER_RADIUS = 1.0;
-    const BALL_RADIUS = 0.55;
-    const PENALTY_BOX_W = 66; 
-    const PENALTY_BOX_D = 40; 
+    // ==========================================
+    // 대폭 상향된 월드 스케일 상수 설정
+    // ==========================================
+    const PLAYER_SCALE = 2.4; // 선수의 전반적인 볼륨감 배율 상향
+    const BALL_RADIUS = 0.95;  // 공의 크기 체감 확대
+    const PENALTY_BOX_W = 120; 
+    const PENALTY_BOX_D = 70; 
 
-    // 전역으로 게임 인스턴스 참조를 저장하기 위한 변수
     let gameInstance = null;
 
+    // 인체 구조화 소재(Material) 캐싱 및 통합 관리
+    function createHumanMaterials(scene) {
+      const mats = {};
+      mats.skin = new StandardMaterial("skin", scene); mats.skin.diffuseColor = new Color3(0.95, 0.79, 0.69);
+      mats.hair = new StandardMaterial("hair", scene); mats.hair.diffuseColor = new Color3(0.18, 0.13, 0.1);
+      mats.eyes = new StandardMaterial("eyes", scene); mats.eyes.diffuseColor = new Color3(0.1, 0.1, 0.1);
+      mats.socks = new StandardMaterial("socks", scene); mats.socks.diffuseColor = new Color3(0.95, 0.95, 0.95);
+      mats.boots = new StandardMaterial("boots", scene); mats.boots.diffuseColor = new Color3(0.1, 0.1, 0.1);
+      mats.gkHome = new StandardMaterial("gkHome", scene); mats.gkHome.diffuseColor = new Color3(0.8, 0.85, 0.1);
+      mats.gkAway = new StandardMaterial("gkAway", scene); mats.gkAway.diffuseColor = new Color3(0.6, 0.1, 0.6);
+
+      // 홈 유니폼 - 세련된 네이비 스트라이프 테스처 생성
+      const texHome = new DynamicTexture("texHome", {width:256, height:256}, scene);
+      const ctxH = texHome.getContext();
+      ctxH.fillStyle = "#1976d2"; ctxH.fillRect(0,0,256,256);
+      ctxH.fillStyle = "#0d47a1"; 
+      for(let i=0; i<4; i++) { ctxH.fillRect(i*64, 0, 32, 256); }
+      texHome.update();
+      mats.jerseyHome = new StandardMaterial("jHome", scene); mats.jerseyHome.diffuseTexture = texHome;
+      mats.pantsHome = new StandardMaterial("pHome", scene); mats.pantsHome.diffuseColor = new Color3(0.15, 0.15, 0.15);
+
+      // 원정 유니폼 - 강렬한 레드 스트라이프 텍스처 생성
+      const texAway = new DynamicTexture("texAway", {width:256, height:256}, scene);
+      const ctxA = texAway.getContext();
+      ctxA.fillStyle = "#d32f2f"; ctxA.fillRect(0,0,256,256);
+      ctxA.fillStyle = "#b71c1c"; 
+      for(let i=0; i<4; i++) { ctxA.fillRect(i*64, 0, 32, 256); }
+      texAway.update();
+      mats.jerseyAway = new StandardMaterial("jAway", scene); mats.jerseyAway.diffuseTexture = texAway;
+      mats.pantsAway = new StandardMaterial("pAway", scene); mats.pantsAway.diffuseColor = new Color3(0.9, 0.9, 0.9);
+
+      return mats;
+    }
+
+    // 디테일한 사람 형태(Humanoid Mesh) 구조 빌더
+    function buildRealisticHumanoid(mesh, isHome, isGK, mats, scene) {
+      const jerseyMat = isGK ? (isHome ? mats.gkHome : mats.gkAway) : (isHome ? mats.jerseyHome : mats.jerseyHome);
+      const pantsMat = isHome ? mats.pantsHome : mats.pantsAway;
+      if (!isHome && !isGK) { jerseyMat.copyFrom(mats.jerseyAway); } // 원정 필드 스킨 바인딩 안전장치
+
+      // 1. 몸통 (Torso) 및 가슴라인 벨런스
+      const torso = MeshBuilder.CreateCylinder("torso", { diameterTop: 1.3, diameterBottom: 0.9, height: 2.2, tessellation: 16 }, scene);
+      torso.position.y = 3.6; torso.scaling.z = 0.75; torso.material = jerseyMat; torso.parent = mesh;
+
+      // 2. 머리 (Head)와 얼굴 디테일 요소 추가
+      const neck = MeshBuilder.CreateCylinder("neck", { diameter: 0.45, height: 0.4 }, scene); neck.position.y = 4.8; neck.material = mats.skin; neck.parent = mesh;
+      const head = MeshBuilder.CreateSphere("head", { diameterX: 0.85, diameterY: 0.95, diameterZ: 0.85 }, scene); head.position.y = 5.4; head.material = mats.skin; head.parent = mesh;
+      
+      const hair = MeshBuilder.CreateSphere("hair", { diameter: 0.88 }, scene); hair.position.set(0, 5.65, -0.05); hair.scaling.set(1.02, 0.7, 1.05); hair.material = mats.hair; hair.parent = mesh;
+      const eyeL = MeshBuilder.CreateSphere("eyeL", { diameter: 0.12 }, scene); eyeL.position.set(-0.18, 5.5, 0.38); eyeL.material = mats.eyes; eyeL.parent = mesh;
+      const eyeR = eyeL.clone("eyeR"); eyeR.position.x = 0.18; eyeR.parent = mesh;
+
+      // 3. 골반 및 하체 바지 (Pelvis & Shorts)
+      const pelvis = MeshBuilder.CreateBox("pelvis", { width: 1.1, height: 0.7, depth: 0.8 }, scene); pelvis.position.y = 2.35; pelvis.material = pantsMat; pelvis.parent = mesh;
+
+      // 4. 애니메이션 연동용 계층 구조 다리 파츠 구성
+      const leftLegRoot = MeshBuilder.CreateBox("L_LegRoot", { size: 0.1 }, scene); leftLegRoot.position.set(-0.35, 2.1, 0); leftLegRoot.parent = mesh; leftLegRoot.isVisible = false;
+      const leftThigh = MeshBuilder.CreateCylinder("L_Thigh", { diameterTop: 0.55, diameterBottom: 0.45, height: 1.1 }, scene); leftThigh.position.y = -0.5; leftThigh.material = pantsMat; leftThigh.parent = leftLegRoot;
+      const leftCalf = MeshBuilder.CreateCylinder("L_Calf", { diameterTop: 0.42, diameterBottom: 0.3, height: 1.1 }, scene); leftCalf.position.y = -1.5; leftCalf.material = mats.socks; leftCalf.parent = leftLegRoot;
+      const leftFoot = MeshBuilder.CreateBox("L_Foot", { width: 0.35, height: 0.25, depth: 0.7 }, scene); leftFoot.position.set(0, -2.1, 0.15); leftFoot.material = mats.boots; leftFoot.parent = leftLegRoot;
+
+      const rightLegRoot = MeshBuilder.CreateBox("R_LegRoot", { size: 0.1 }, scene); rightLegRoot.position.set(0.35, 2.1, 0); rightLegRoot.parent = mesh; rightLegRoot.isVisible = false;
+      const rightThigh = leftThigh.clone("R_Thigh"); rightThigh.parent = rightLegRoot;
+      const rightCalf = leftCalf.clone("R_Calf"); rightCalf.parent = rightLegRoot;
+      const rightFoot = leftFoot.clone("R_Foot"); rightFoot.parent = rightLegRoot;
+
+      // 5. 어깨 및 양팔 파츠 구성
+      const leftArmRoot = MeshBuilder.CreateBox("L_ArmRoot", { size: 0.1 }, scene); leftArmRoot.position.set(-0.85, 4.4, 0); leftArmRoot.parent = mesh; leftArmRoot.isVisible = false;
+      const leftArm = MeshBuilder.CreateCylinder("L_Arm", { diameterTop: 0.35, diameterBottom: 0.28, height: 1.6 }, scene); leftArm.position.y = -0.6; leftArm.material = jerseyMat; leftArm.parent = leftArmRoot;
+      const leftHand = MeshBuilder.CreateSphere("L_Hand", { diameter: 0.28 }, scene); leftHand.position.y = -1.45; leftHand.material = mats.skin; leftHand.parent = leftArmRoot;
+
+      const rightArmRoot = MeshBuilder.CreateBox("R_ArmRoot", { size: 0.1 }, scene); rightArmRoot.position.set(0.85, 4.4, 0); rightArmRoot.parent = mesh; rightArmRoot.isVisible = false;
+      const rightArm = leftArm.clone("R_Arm"); rightArm.parent = rightArmRoot;
+      const rightHand = leftHand.clone("R_Hand"); rightHand.parent = rightArmRoot;
+
+      return { leftLegRoot, rightLegRoot, leftArmRoot, rightArmRoot, torso };
+    }
+
     // ==========================================
-    // 1. Player 클래스 (유저 제어 캐릭터 - HOME 팀 소속)
+    // 1. Player 클래스 (유저 제어)
     // ==========================================
     class Player {
-      constructor(scene) {
+      constructor(scene, mats) {
         this.scene = scene;
-        this.team = "home"; // 유저는 홈 팀
-        this.minSpeed = 0.18;     
-        this.maxSpeed = 0.40;     
-        this.currentSpeed = 0.18;  
-        this.acceleration = 0.014; 
+        this.mats = mats;
+        this.team = "home";
+        
+        // 현실적인 축구 매치 움직임을 위한 속도 하향 밸런싱
+        this.minSpeed = 0.14;     
+        this.maxSpeed = 0.28;     
+        this.currentSpeed = 0.14;  
+        this.acceleration = 0.008; 
         
         this.inputMap = {};
         this.hasBall = false;
         this.moveDirection = new Vector3(0, 0, 1);
         
-        this.createDetailedHumanoid();
-        this.setupInput();
-      }
-
-      createDetailedHumanoid() {
         this.mesh = MeshBuilder.CreateBox("playerRoot", { size: 0.1 }, this.scene);
         this.mesh.isVisible = false;
-
-        const skinMat = new StandardMaterial("skinMat", this.scene); skinMat.diffuseColor = new Color3(0.93, 0.77, 0.67);
-        const jerseyMat = new StandardMaterial("jerseyMat", this.scene); jerseyMat.diffuseColor = new Color3(0.85, 0.08, 0.08); 
-        const pantsMat = new StandardMaterial("pantsMat", this.scene); pantsMat.diffuseColor = new Color3(0.1, 0.1, 0.1);
-        const socksMat = new StandardMaterial("socksMat", this.scene); socksMat.diffuseColor = new Color3(0.9, 0.9, 0.9);
-        const bootsMat = new StandardMaterial("bootsMat", this.scene); bootsMat.diffuseColor = new Color3(0.15, 0.65, 0.15);
-
-        this.torso = MeshBuilder.CreateCylinder("torso", { diameterTop: 1.1, diameterBottom: 0.8, height: 1.6, tessellation: 12 }, this.scene);
-        this.torso.position.y = 2.4; this.torso.scaling.z = 0.65; this.torso.material = jerseyMat; this.torso.parent = this.mesh;
-
-        const numberPlate = MeshBuilder.CreatePlane("numPlate", { width: 0.65, height: 0.8 }, this.scene);
-        numberPlate.position.set(0, 2.5, -0.36); numberPlate.rotation.y = Math.PI; 
-        const tex = new DynamicTexture("dynamicTex", {width: 256, height: 256}, this.scene); tex.hasAlpha = true; const ctx = tex.getContext();
-        ctx.fillStyle = "transparent"; ctx.font = "bold 150px Arial"; ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillText("7", 128, 128); tex.update();
-        const numMat = new StandardMaterial("numMat", this.scene); numMat.diffuseTexture = tex; numberPlate.material = numMat; numberPlate.parent = this.mesh;
-
-        const neck = MeshBuilder.CreateCylinder("neck", { diameter: 0.3, height: 0.35 }, this.scene); neck.position.y = 3.3; neck.material = skinMat; neck.parent = this.mesh;
-        this.head = MeshBuilder.CreateSphere("head", { diameterX: 0.65, diameterY: 0.75, diameterZ: 0.68 }, this.scene); this.head.position.y = 3.75; this.head.material = skinMat; this.head.parent = this.mesh;
-        const hair = MeshBuilder.CreateSphere("hair", { diameter: 0.68 }, this.scene); hair.position.set(0, 3.9, -0.06); const hairMat = new StandardMaterial("hairMat", this.scene); hairMat.diffuseColor = new Color3(0.15, 0.1, 0.05); hair.material = hairMat; hair.parent = this.mesh;
-
-        this.pelvis = MeshBuilder.CreateBox("pelvis", { width: 0.9, height: 0.5, depth: 0.6 }, this.scene); this.pelvis.position.y = 1.55; this.pelvis.material = pantsMat; this.pelvis.parent = this.mesh;
-
-        this.leftLegRoot = MeshBuilder.CreateBox("leftLegRoot", { size: 0.05 }, this.scene); this.leftLegRoot.position.set(-0.3, 1.4, 0); this.leftLegRoot.parent = this.mesh; this.leftLegRoot.isVisible = false;
-        const leftThigh = MeshBuilder.CreateCylinder("leftThigh", { diameterTop: 0.4, diameterBottom: 0.32, height: 0.65 }, this.scene); leftThigh.position.y = -0.3; leftThigh.material = pantsMat; leftThigh.parent = this.leftLegRoot;
-        const leftCalf = MeshBuilder.CreateCylinder("leftCalf", { diameterTop: 0.3, diameterBottom: 0.2, height: 0.65 }, this.scene); leftCalf.position.y = -0.92; leftCalf.material = socksMat; leftCalf.parent = this.leftLegRoot;
-        const leftFoot = MeshBuilder.CreateBox("leftFoot", { width: 0.24, height: 0.18, depth: 0.45 }, this.scene); leftFoot.position.set(0, -1.3, 0.09); leftFoot.material = bootsMat; leftFoot.parent = this.leftLegRoot;
-
-        this.rightLegRoot = MeshBuilder.CreateBox("rightLegRoot", { size: 0.05 }, this.scene); this.rightLegRoot.position.set(0.3, 1.4, 0); this.rightLegRoot.parent = this.mesh; this.rightLegRoot.isVisible = false;
-        const rightThigh = leftThigh.clone("rightThigh"); rightThigh.parent = this.rightLegRoot;
-        const rightCalf = leftCalf.clone("rightCalf"); rightCalf.parent = this.rightLegRoot;
-        const rightFoot = leftFoot.clone("rightFoot"); rightFoot.parent = this.rightLegRoot;
-
-        this.leftArm = MeshBuilder.CreateCylinder("leftArm", { diameterTop: 0.25, diameterBottom: 0.2, height: 1.1 }, this.scene); this.leftArm.position.set(-0.72, 2.4, 0); this.leftArm.material = jerseyMat; this.leftArm.parent = this.mesh;
-        this.rightArm = this.leftArm.clone("rightArm"); this.rightArm.position.x = 0.72; this.rightArm.parent = this.mesh;
-
+        this.anims = buildRealisticHumanoid(this.mesh, true, false, this.mats, this.scene);
+        
+        this.setupInput();
         this.resetPosition();
       }
 
       resetPosition() {
-        this.mesh.position.set(0, 0, -55); 
+        this.mesh.position.set(0, 0, -45); 
         this.moveDirection.set(0, 0, 1); 
         this.mesh.rotation.y = 0;
         this.currentSpeed = this.minSpeed;
@@ -199,307 +243,219 @@
 
       setupInput() {
         this.scene.onKeyboardObservable.add((kbInfo) => {
-          switch (kbInfo.type) {
-            case BABYLON.KeyboardEventTypes.KEYDOWN:
-              this.inputMap[kbInfo.event.key.toLowerCase()] = true;
-              // [개선 기능 2] 유저 패스 조작: S 키 연동
-              if (kbInfo.event.key.toLowerCase() === 's' && this.hasBall && gameInstance) {
-                gameInstance.executePassSystem(this);
-              }
-              break;
-            case BABYLON.KeyboardEventTypes.KEYUP:
-              this.inputMap[kbInfo.event.key.toLowerCase()] = false;
-              break;
+          const key = kbInfo.event.key.toLowerCase();
+          if (kbInfo.type === BABYLON.KeyboardEventTypes.KEYDOWN) {
+            this.inputMap[key] = true;
+            if (key === 's' && this.hasBall && gameInstance) gameInstance.executePassSystem(this);
+            if (key === ' ' && !this.hasBall && gameInstance) gameInstance.executeUserTackle();
+            if (key === 'd' && this.hasBall && gameInstance) {
+              gameInstance.isChargingShoot = true;
+              document.getElementById("power-bar-container").style.display = "block";
+            }
+          } else if (kbInfo.type === BABYLON.KeyboardEventTypes.KEYUP) {
+            this.inputMap[key] = false;
+            if (key === 'd' && gameInstance && gameInstance.isChargingShoot) gameInstance.executeUserShoot();
           }
         });
       }
 
       update(fieldWidth, fieldHeight) {
         let moveX = 0; let moveZ = 0;
-
-        if (this.inputMap["arrowup"])    moveX -= 1; 
-        if (this.inputMap["arrowdown"])  moveX += 1; 
-        if (this.inputMap["arrowleft"])  moveZ -= 1; 
-        if (this.inputMap["arrowright"]) moveZ += 1; 
+        if (this.inputMap["arrowup"])    moveZ += 1; 
+        if (this.inputMap["arrowdown"])  moveZ -= 1; 
+        if (this.inputMap["arrowleft"])  moveX -= 1; 
+        if (this.inputMap["arrowright"]) moveX += 1; 
 
         const isMoving = (moveX !== 0 || moveZ !== 0);
 
         if (this.inputMap["e"] && isMoving) {
           this.currentSpeed = Math.min(this.maxSpeed, this.currentSpeed + this.acceleration);
         } else {
-          this.currentSpeed = Math.max(this.minSpeed, this.currentSpeed - this.acceleration * 1.5);
+          this.currentSpeed = Math.max(this.minSpeed, this.currentSpeed - this.acceleration * 2.0);
         }
 
         if (isMoving) {
           const inputDir = new Vector3(moveX, 0, moveZ).normalize();
           this.mesh.position.addInPlace(inputDir.scale(this.currentSpeed));
           this.moveDirection.copyFrom(inputDir);
+          this.mesh.rotation.y = Math.atan2(inputDir.x, inputDir.z);
 
-          const angle = Math.atan2(inputDir.x, inputDir.z);
-          this.mesh.rotation.y = angle;
-
-          const animeSpeed = this.currentSpeed * 0.12; const time = performance.now() * animeSpeed;
-          this.leftLegRoot.rotation.x = Math.sin(time) * 0.6; this.rightLegRoot.rotation.x = -Math.sin(time) * 0.6;
-          this.leftArm.rotation.x = -Math.sin(time) * 0.4; this.rightArm.rotation.x = Math.sin(time) * 0.4;
-          this.torso.rotation.x = 0.12;
+          // 다이나믹 사람 형태 관절 주행 애니메이션 계산
+          const time = performance.now() * this.currentSpeed * 0.15;
+          this.anims.leftLegRoot.rotation.x = Math.sin(time) * 0.7;
+          this.anims.rightLegRoot.rotation.x = -Math.sin(time) * 0.7;
+          this.anims.leftArmRoot.rotation.x = -Math.sin(time) * 0.5;
+          this.anims.rightArmRoot.rotation.x = Math.sin(time) * 0.5;
+          this.anims.torso.rotation.x = 0.1;
         } else {
-          this.leftLegRoot.rotation.x = 0; this.rightLegRoot.rotation.x = 0;
-          this.leftArm.rotation.x = 0; this.rightArm.rotation.x = 0; this.torso.rotation.x = 0;
+          this.anims.leftLegRoot.rotation.x = 0; this.anims.rightLegRoot.rotation.x = 0;
+          this.anims.leftArmRoot.rotation.x = 0; this.anims.rightArmRoot.rotation.x = 0;
+          this.anims.torso.rotation.x = 0;
         }
 
-        const limitX = (fieldWidth / 2) - 1.0; const limitZ = (fieldHeight / 2) - 1.0;
+        const limitX = (fieldWidth / 2) - 2.5; const limitZ = (fieldHeight / 2) - 2.5;
         this.mesh.position.x = Math.max(-limitX, Math.min(limitX, this.mesh.position.x));
         this.mesh.position.z = Math.max(-limitZ, Math.min(limitZ, this.mesh.position.z));
       }
     }
 
     // ==========================================
-    // 2. DummyPlayer 클래스 (수비 무작정 추적 버그 해결 + FSM 공격 AI 탑재)
+    // 2. DummyPlayer 클래스 (전술형 대형 AI)
     // ==========================================
     class DummyPlayer {
-      constructor(name, team, role, position, scene) {
+      constructor(name, team, role, position, scene, mats) {
         this.name = name;
         this.team = team;
         this.role = role; 
         this.initialPos = position.clone(); 
         this.targetPos = position.clone();
         this.scene = scene;
+        this.mats = mats;
         
-        this.baseSpeed = 0.15;
-        this.dashSpeed = 0.30; 
-        this.gkSpeed = 0.24; 
+        // 현실적 경기 흐름을 위해 AI 스피드 균형 하향 조정
+        this.baseSpeed = 0.11;
+        this.dashSpeed = 0.19; 
+        this.gkSpeed = 0.16; 
         this.hasBall = false;
+        this.zoneRadius = 65.0; 
 
-        // [버그 수정 1] 상대팀 무작정 따라오기 방지용 고유 구역 반경(지역 방어)
-        this.zoneRadius = 38.0; 
         this.moveDirection = new Vector3(0, 0, (this.team === "home") ? 1 : -1);
-
-        // AI 의사결정 딜레이 타이머
         this.decisionTimer = Math.random() * 30;
 
-        this.createMesh();
-      }
-
-      createMesh() {
         this.mesh = MeshBuilder.CreateBox(this.name + "Root", { size: 0.1 }, this.scene);
         this.mesh.isVisible = false;
         this.mesh.position.copyFrom(this.initialPos);
-
-        const skinMat = new StandardMaterial("dummySkin", this.scene); skinMat.diffuseColor = new Color3(0.92, 0.75, 0.65);
-        const pantsMat = new StandardMaterial("dummyPants", this.scene); pantsMat.diffuseColor = (this.team === "home") ? new Color3(0.1, 0.1, 0.1) : new Color3(0.9, 0.9, 0.9);
         
-        const jerseyMat = new StandardMaterial("dummyJersey", this.scene);
-        if (this.role === "GK") {
-          if (this.team === "home") {
-            jerseyMat.diffuseColor = new Color3(0.7, 0.9, 0.0); 
-          } else {
-            jerseyMat.diffuseColor = new Color3(0.5, 0.0, 0.5); 
-          }
-        } else {
-          jerseyMat.diffuseColor = (this.team === "home") ? new Color3(0.85, 0.08, 0.08) : new Color3(0.08, 0.25, 0.85);
-        }
-
-        const torso = MeshBuilder.CreateCylinder("dTorso", { diameterTop: 1.1, diameterBottom: 0.8, height: 1.6, tessellation: 10 }, this.scene);
-        torso.position.y = 2.4; torso.scaling.z = 0.65; torso.material = jerseyMat; torso.parent = this.mesh;
-
-        const head = MeshBuilder.CreateSphere("dHead", { diameter: 0.7 }, this.scene); head.position.y = 3.6; head.material = skinMat; head.parent = this.mesh;
-        const pelvis = MeshBuilder.CreateBox("dPelvis", { width: 0.9, height: 0.5, depth: 0.6 }, this.scene); pelvis.position.y = 1.55; pelvis.material = pantsMat; pelvis.parent = this.mesh;
-
-        this.leftLeg = MeshBuilder.CreateCylinder("dLLeg", { diameter: 0.32, height: 1.3 }, this.scene); this.leftLeg.position.set(-0.3, 0.75, 0); this.leftLeg.material = pantsMat; this.leftLeg.parent = this.mesh;
-        this.rightLeg = this.leftLeg.clone("dRLeg"); this.rightLeg.position.x = 0.3; this.rightLeg.parent = this.mesh;
-
-        this.mesh.rotation.y = (this.team === "home") ? 0 : Math.PI;
+        const isHome = (this.team === "home");
+        const isGK = (this.role === "GK");
+        this.anims = buildRealisticHumanoid(this.mesh, isHome, isGK, this.mats, this.scene);
+        this.mesh.rotation.y = isHome ? 0 : Math.PI;
       }
 
       updateAI(playerObj, ball, fieldHeight, isClosestDefender, onTackleSuccess) {
-        const playerPos = playerObj.mesh.position;
         if (this.role === "GK") {
-          this.updateGKLogic(playerPos, ball, fieldHeight, onTackleSuccess);
+          this.updateGKLogic(playerObj, ball, fieldHeight, onTackleSuccess);
         } else {
           this.updateTacticalLogic(playerObj, ball, isClosestDefender, onTackleSuccess);
         }
       }
 
-      updateGKLogic(playerPos, ball, fieldHeight, onTackleSuccess) {
+      updateGKLogic(playerObj, ball, fieldHeight, onTackleSuccess) {
         const ballPos = ball.position;
         const isAwayGK = (this.team === "away");
-        
-        const boxMinX = -PENALTY_BOX_W / 2 + 1.0;
-        const boxMaxX = PENALTY_BOX_W / 2 - 1.0;
+        const boxMinX = -PENALTY_BOX_W / 2 + 5.0; const boxMaxX = PENALTY_BOX_W / 2 - 5.0;
         const boxZCenter = isAwayGK ? (fieldHeight / 2) : -(fieldHeight / 2);
-        
         const boxMinZ = isAwayGK ? (fieldHeight / 2 - PENALTY_BOX_D) : -(fieldHeight / 2);
         const boxMaxZ = isAwayGK ? (fieldHeight / 2) : -(fieldHeight / 2 + PENALTY_BOX_D);
 
         let targetX = ballPos.x;
-        let targetZ = isAwayGK ? (boxZCenter - 4.0) : (boxZCenter + 4.0);
-
+        let targetZ = isAwayGK ? (boxZCenter - 6.0) : (boxZCenter + 6.0);
         const isInBox = isAwayGK ? (ballPos.z > boxMinZ) : (ballPos.z < boxMaxZ);
-        if (isInBox) {
-          targetX = ballPos.x;
-          targetZ = ballPos.z;
-        }
+        if (isInBox) { targetX = ballPos.x; targetZ = ballPos.z; }
 
         this.targetPos.x = Math.max(boxMinX, Math.min(boxMaxX, targetX));
-        if (isAwayGK) {
-          this.targetPos.z = Math.max(boxMinZ, Math.min(boxMaxZ, targetZ));
-        } else {
-          this.targetPos.z = Math.min(boxMinZ, Math.max(boxMaxZ, targetZ));
-        }
+        this.targetPos.z = isAwayGK ? Math.max(boxMinZ, Math.min(boxMaxZ, targetZ)) : Math.min(boxMinZ, Math.max(boxMaxZ, targetZ));
 
         const moveVec = this.targetPos.subtract(this.mesh.position);
-        let currentGkSpeed = isInBox ? this.dashSpeed : this.gkSpeed;
+        let speed = isInBox ? this.dashSpeed : this.gkSpeed;
 
-        if (moveVec.length() > 0.1) {
-          moveVec.normalize();
-          this.mesh.position.addInPlace(moveVec.scale(currentGkSpeed));
+        if (moveVec.length() > 0.3) {
+          moveVec.normalize(); this.mesh.position.addInPlace(moveVec.scale(speed));
           this.mesh.rotation.y = Math.atan2(moveVec.x, moveVec.z);
           this.moveDirection.copyFrom(moveVec);
-          
-          const time = performance.now() * 0.02;
-          this.leftLeg.rotation.x = Math.sin(time) * 0.5; this.rightLeg.rotation.x = -Math.sin(time) * 0.5;
         } else {
-          this.leftLeg.rotation.x = 0; this.rightLeg.rotation.x = 0;
-          const lookVec = ballPos.subtract(this.mesh.position);
-          this.mesh.rotation.y = Math.atan2(lookVec.x, lookVec.z);
+          const lookVec = ballPos.subtract(this.mesh.position); this.mesh.rotation.y = Math.atan2(lookVec.x, lookVec.z);
         }
 
-        const distToBall = Vector3.Distance(this.mesh.position, ballPos);
-        if (distToBall < 4.2) {
-          if (Math.random() < 0.45) {
-            this.mesh.position.addInPlace(ballPos.subtract(this.mesh.position).normalize().scale(1.5));
-            onTackleSuccess(this);
-          }
+        if (Vector3.Distance(this.mesh.position, ballPos) < 5.0 && !this.hasBall && !playerObj.hasBall) {
+          if (Math.random() < 0.25) onTackleSuccess(this);
         }
       }
 
-      // [핵심 변경 및 추가]: 지역 수비 알고리즘 + 상대팀 종합 공격 AI
       updateTacticalLogic(playerObj, ball, isClosestDefender, onTackleSuccess) {
         const ballPos = ball.position;
         const playerPos = playerObj.mesh.position;
         
-        // ----------------------------------------------------
-        // [A] 공격 상태 (상대팀인 내가 공을 가지고 있을 때)
-        // ----------------------------------------------------
         if (this.hasBall) {
           this.decisionTimer++;
-          
-          // 아군 골대(HOME 골대) 위치 정의
-          const enemyGoalPos = new Vector3(0, BALL_RADIUS, -100); 
+          const targetGoalZ = (this.team === "away") ? -160 : 160;
+          const enemyGoalPos = new Vector3(0, BALL_RADIUS, targetGoalZ);
           const distToGoal = Vector3.Distance(this.mesh.position, enemyGoalPos);
 
-          // 1단계 판단: 슈팅 (유저 골대 근처면 사정없이 슛)
-          if (distToGoal < 45.0 && this.decisionTimer > 20) {
+          if (distToGoal < 75.0 && this.decisionTimer > 30) {
             this.decisionTimer = 0;
             const shootDir = enemyGoalPos.subtract(this.mesh.position).normalize();
-            this.mesh.rotation.y = Math.atan2(shootDir.x, shootDir.z);
-            
             if (gameInstance) {
-              gameInstance.ballVelocity.copyFrom(shootDir.scale(4.8));
-              gameInstance.ballVelocity.y = 0.6; // 살짝 띄우는 탄도
-              this.hasBall = false;
+              gameInstance.ballVelocity.copyFrom(shootDir.scale(5.5));
+              gameInstance.ballVelocity.y = 0.6; this.hasBall = false;
             }
             return;
           }
 
-          // 2단계 판단: 패스 (주기적으로 앞쪽 동료에게 볼 배급)
-          if (this.decisionTimer > 45) {
+          if (this.decisionTimer > 55 && gameInstance && Math.random() < 0.45) {
             this.decisionTimer = 0;
-            if (gameInstance && Math.random() < 0.6) {
-              const passSuccess = gameInstance.executePassSystem(this);
-              if (passSuccess) return;
-            }
+            if (gameInstance.executePassSystem(this)) return;
           }
 
-          // 3단계 판단: 드리블 (기본 행동 - 유저 골대 향해 돌파)
           const dribbleDir = enemyGoalPos.subtract(this.mesh.position).normalize();
-          // 정면 차단 방지용 약간의 측면 흔들기 무빙 추가
-          dribbleDir.x += Math.sin(performance.now() * 0.005) * 0.25;
-          dribbleDir.normalize();
-
-          this.mesh.position.addInPlace(dribbleDir.scale(this.baseSpeed * 1.3));
+          dribbleDir.x += Math.sin(performance.now() * 0.003) * 0.25; dribbleDir.normalize();
+          this.mesh.position.addInPlace(dribbleDir.scale(this.baseSpeed * 1.15));
           this.mesh.rotation.y = Math.atan2(dribbleDir.x, dribbleDir.z);
           this.moveDirection.copyFrom(dribbleDir);
-
-          const time = performance.now() * 0.02;
-          this.leftLeg.rotation.x = Math.sin(time) * 0.5; this.rightLeg.rotation.x = -Math.sin(time) * 0.5;
           return;
         }
 
-        // ----------------------------------------------------
-        // [B] 아군 서포트 상태 (상대팀 동료가 공을 지니고 전진할 때)
-        // ----------------------------------------------------
+        // 라인 유지 및 수비 대형 전환 시퀀스
         let teamHasBall = gameInstance ? gameInstance.dummies.some(d => d.team === this.team && d.hasBall) : false;
         if (teamHasBall) {
-          // 공격 가담 무빙: 공격 방향으로 라인을 함께 올리되 포지션 유지
           let supportTarget = this.initialPos.clone();
-          supportTarget.z -= 40.0; // 홈 진영 쪽으로 전진 위치 잡기
-          
+          supportTarget.z += (this.team === "away") ? -55.0 : 55.0;
           const moveVec = supportTarget.subtract(this.mesh.position);
-          if (moveVec.length() > 1.5) {
-            moveVec.normalize();
-            this.mesh.position.addInPlace(moveVec.scale(this.baseSpeed));
+          if (moveVec.length() > 3.0) {
+            moveVec.normalize(); this.mesh.position.addInPlace(moveVec.scale(this.baseSpeed));
             this.mesh.rotation.y = Math.atan2(moveVec.x, moveVec.z);
             this.moveDirection.copyFrom(moveVec);
           }
           return;
         }
 
-        // ----------------------------------------------------
-        // [C] 수비 상태: [버그 해결] 무작정 따라가지 않는 스마트 지역 방어
-        // ----------------------------------------------------
         const distFromBaseToBall = Vector3.Distance(this.initialPos, ballPos);
-        const distToPlayer = Vector3.Distance(this.mesh.position, playerPos);
+        const trackTargetPos = playerObj.hasBall ? playerPos : ballPos;
 
-        // 원정팀(AI)의 고유 진형 구역 내에 공이 왔거나 최전방 마크맨인 경우에만 수비 압박 개시
-        if (this.team === "away" && (distFromBaseToBall < this.zoneRadius || isClosestDefender)) {
+        if (distFromBaseToBall < this.zoneRadius || isClosestDefender) {
           let currentMoveSpeed = isClosestDefender ? this.dashSpeed : this.baseSpeed;
-          
           if (isClosestDefender) {
-            // [기존 전술 차단 유지]: 유저 가속도를 고려한 길목 사전 예측
-            const leadTime = distToPlayer * 0.08;
-            const interceptOffset = playerObj.moveDirection.scale(playerObj.currentSpeed * leadTime * 12);
-            this.targetPos.copyFrom(playerPos.add(interceptOffset));
+            const leadTime = Vector3.Distance(this.mesh.position, trackTargetPos) * 0.05;
+            const interceptOffset = playerObj.hasBall ? playerObj.moveDirection.scale(playerObj.currentSpeed * leadTime * 8) : new Vector3(0,0,0);
+            this.targetPos.copyFrom(trackTargetPos.add(interceptOffset));
           } else {
-            // 2선 협력 수비진 형성
-            const backUpOffset = new Vector3(this.initialPos.x * 0.25, 0, 4.0);
-            this.targetPos.copyFrom(playerPos.add(backUpOffset));
+            this.targetPos.copyFrom(trackTargetPos.add(new Vector3(this.initialPos.x * 0.15, 0, (this.team === "away") ? 8.0 : -8.0)));
           }
         } else {
-          // 공이 내 수비구역 영역 밖으로 벗어났다면, 미련없이 자신의 원래 전술 진형 자리로 신속 복귀!
           this.targetPos.copyFrom(this.initialPos);
         }
 
-        // 실제 하드웨어 추적 이동 구현
         const moveVec = this.targetPos.subtract(this.mesh.position);
-        if (moveVec.length() > 0.5) {
-          moveVec.normalize();
-          let speedFactor = (Vector3.Distance(this.mesh.position, this.initialPos) > 5.0 && this.targetPos.equals(this.initialPos)) ? this.dashSpeed : this.baseSpeed;
-          this.mesh.position.addInPlace(moveVec.scale(speedFactor));
+        if (moveVec.length() > 1.0) {
+          moveVec.normalize(); this.mesh.position.addInPlace(moveVec.scale(currentMoveSpeed));
           this.mesh.rotation.y = Math.atan2(moveVec.x, moveVec.z);
           this.moveDirection.copyFrom(moveVec);
 
-          const time = performance.now() * 0.02;
-          this.leftLeg.rotation.x = Math.sin(time) * 0.6; this.rightLeg.rotation.x = -Math.sin(time) * 0.6;
+          const time = performance.now() * currentMoveSpeed * 0.15;
+          this.anims.leftLegRoot.rotation.x = Math.sin(time) * 0.6; this.anims.rightLegRoot.rotation.x = -Math.sin(time) * 0.6;
         } else {
-          this.leftLeg.rotation.x = 0; this.rightLeg.rotation.x = 0;
-          // 제자리 대기 시에는 공을 조시하도록 시선 고정
-          const lookVec = ballPos.subtract(this.mesh.position);
-          this.mesh.rotation.y = Math.atan2(lookVec.x, lookVec.z);
+          this.anims.leftLegRoot.rotation.x = 0; this.anims.rightLegRoot.rotation.x = 0;
+          const lookVec = ballPos.subtract(this.mesh.position); this.mesh.rotation.y = Math.atan2(lookVec.x, lookVec.z);
         }
 
-        // [기존 액티브 태클]: 유저가 볼 가졌을 때 몸싸움 확률 적용 차단
-        if (distToPlayer < 2.9 && playerObj.hasBall) {
-          if (Math.random() < 0.30) {
-            this.mesh.position.addInPlace(playerPos.subtract(this.mesh.position).normalize().scale(0.8));
-            onTackleSuccess(this);
-          }
+        if (this.team === "away" && Vector3.Distance(this.mesh.position, playerPos) < 4.0 && playerObj.hasBall) {
+          if (Math.random() < 0.018) onTackleSuccess(this);
         }
       }
     }
 
     // ==========================================
-    // 3. Game 클래스 (엔진 종합 구동 시스템)
+    // 3. Game 클래스 (엔진 메인 코어)
     // ==========================================
     class Game {
       constructor(canvas) {
@@ -507,117 +463,102 @@
         this.engine = new Engine(this.canvas, true);
         this.scene = new Scene(this.engine);
         
-        this.fieldWidth = 140; this.fieldHeight = 200;
+        // 현실적 축구 전술 비율에 맞춘 초대형 구장 축척 스케일 상향
+        this.fieldWidth = 240; this.fieldHeight = 340;
         this.ballVelocity = new Vector3(0, 0, 0);
-        this.friction = 0.985; this.gravity = 0.045; this.isResetting = false;
-
+        this.friction = 0.985; this.gravity = 0.06; this.isResetting = false;
         this.scoreHome = 0; this.scoreAway = 0; 
         
-        this.shootPowerMax = 6.5; 
-        this.shootPowerCurrent = 1.0; 
-        this.isChargingShoot = false;
+        this.shootPowerMax = 9.0; this.shootPowerCurrent = 1.0; this.isChargingShoot = false;
         this.cameraShakeIntensity = 0;
-
         this.dummies = [];
+
+        this.mats = createHumanMaterials(this.scene);
 
         this.initScene();
         this.createProceduralGrassField();
         this.createGKZoneBoxes(); 
         this.createRealGoals();
         this.createBall();
-        this.player = new Player(this.scene);
+        this.player = new Player(this.scene, this.mats);
         this.spawnFormationDummies();
         this.setupMainLoop();
 
-        gameInstance = this; // 전역 바인딩
+        gameInstance = this;
       }
 
       initScene() {
         this.scene.clearColor = new Color3(0.53, 0.81, 0.92);
-        this.camera = new FreeCamera("sideFollowCamera", new Vector3(90, 45, 0), this.scene);
+        this.camera = new FreeCamera("mainTacticalCamera", new Vector3(120, 80, 0), this.scene);
         this.camera.setTarget(new Vector3(0, 0, 0)); 
-        this.light = new HemisphericLight("light", new Vector3(0, 1, 0), this.scene); this.light.intensity = 0.8;
-        const sunLight = new DirectionalLight("sunLight", new Vector3(-1, -2, -0.5), this.scene); sunLight.intensity = 0.9;
+        this.light = new HemisphericLight("skyLight", new Vector3(0, 1, 0), this.scene); this.light.intensity = 0.75;
+        const sunLight = new DirectionalLight("sunLight", new Vector3(-1, -2, -0.4), this.scene); sunLight.intensity = 0.95;
       }
 
       createGKZoneBoxes() {
-        const zoneMat = new StandardMaterial("gkZoneMat", this.scene);
-        zoneMat.diffuseColor = new Color3(1, 0.2, 0); 
-        zoneMat.alpha = 0.05; 
-
+        const zoneMat = new StandardMaterial("gkZoneMat", this.scene); zoneMat.diffuseColor = new Color3(1, 0.3, 0); zoneMat.alpha = 0.015; 
         this.awayGKBox = MeshBuilder.CreateBox("awayGKBox", { width: PENALTY_BOX_W, height: 0.1, depth: PENALTY_BOX_D }, this.scene);
-        this.awayGKBox.position.set(0, 0.05, (this.fieldHeight / 2) - (PENALTY_BOX_D / 2));
-        this.awayGKBox.material = zoneMat;
-      }
-
-      checkInAwayGKBox() {
-        const pPos = this.player.mesh.position;
-        const boxMinX = -PENALTY_BOX_W / 2; const boxMaxX = PENALTY_BOX_W / 2;
-        const boxMinZ = (this.fieldHeight / 2) - PENALTY_BOX_D; const boxMaxZ = this.fieldHeight / 2;
-        return (pPos.x >= boxMinX && pPos.x <= boxMaxX && pPos.z >= boxMinZ && pPos.z <= boxMaxZ);
+        this.awayGKBox.position.set(0, 0.05, (this.fieldHeight / 2) - (PENALTY_BOX_D / 2)); this.awayGKBox.material = zoneMat;
       }
 
       spawnFormationDummies() {
-        // 홈 팀 진형 배치 (유저 아군 - 블루계열 자동 지원용)
+        // 초대형 필드 축척에 맞춘 정밀 포지셔닝 타겟팅
         const homePositions = [
-          { role: "GK", coords: new Vector3(0, 0, -94) }, 
-          { role: "FIELD", coords: new Vector3(-45, 0, -65) }, { role: "FIELD", coords: new Vector3(-15, 0, -70) },
-          { role: "FIELD", coords: new Vector3(15, 0, -70) }, { role: "FIELD", coords: new Vector3(45, 0, -65) }, { role: "FIELD", coords: new Vector3(-18, 0, -42) },
-          { role: "FIELD", coords: new Vector3(18, 0, -42) }, { role: "FIELD", coords: new Vector3(-40, 0, -18) }, { role: "FIELD", coords: new Vector3(0, 0, -18) }, { role: "FIELD", coords: new Vector3(40, 0, -18) }
+          { role: "GK", coords: new Vector3(0, 0, -160) }, 
+          { role: "FIELD", coords: new Vector3(-75, 0, -100) }, { role: "FIELD", coords: new Vector3(-25, 0, -110) },
+          { role: "FIELD", coords: new Vector3(25, 0, -110) }, { role: "FIELD", coords: new Vector3(75, 0, -100) }, 
+          { role: "FIELD", coords: new Vector3(-35, 0, -50) }, { role: "FIELD", coords: new Vector3(35, 0, -50) }, 
+          { role: "FIELD", coords: new Vector3(-65, 0, -10) }, { role: "FIELD", coords: new Vector3(0, 0, -15) }, { role: "FIELD", coords: new Vector3(65, 0, -10) }
         ];
-        // 어웨이 팀 진형 배치 (상대팀 AI - 레드지옥 스쿼드 4-2-3-1 대형)
         const awayPositions = [
-          { role: "GK", coords: new Vector3(0, 0, 94) }, 
-          { role: "FIELD", coords: new Vector3(45, 0, 68) }, { role: "FIELD", coords: new Vector3(15, 0, 72) },
-          { role: "FIELD", coords: new Vector3(-15, 0, 72) }, { role: "FIELD", coords: new Vector3(-45, 0, 68) }, 
-          { role: "FIELD", coords: new Vector3(20, 0, 45) }, { role: "FIELD", coords: new Vector3(-20, 0, 45) }, 
-          { role: "FIELD", coords: new Vector3(35, 0, 20) }, { role: "FIELD", coords: new Vector3(0, 0, 25) }, { role: "FIELD", coords: new Vector3(-35, 0, 20) },
-          { role: "FIELD", coords: new Vector3(0, 0, 2) }   
+          { role: "GK", coords: new Vector3(0, 0, 160) }, 
+          { role: "FIELD", coords: new Vector3(75, 0, 100) }, { role: "FIELD", coords: new Vector3(25, 0, 110) },
+          { role: "FIELD", coords: new Vector3(-25, 0, 110) }, { role: "FIELD", coords: new Vector3(-75, 0, 100) }, 
+          { role: "FIELD", coords: new Vector3(35, 0, 50) }, { role: "FIELD", coords: new Vector3(-35, 0, 50) }, 
+          { role: "FIELD", coords: new Vector3(60, 0, 20) }, { role: "FIELD", coords: new Vector3(0, 0, 25) }, { role: "FIELD", coords: new Vector3(-60, 0, 20) },
+          { role: "FIELD", coords: new Vector3(0, 0, 5) }   
         ];
-        homePositions.forEach((p, idx) => { this.dummies.push(new DummyPlayer(`Home_${p.role}_${idx}`, "home", p.role, p.coords, this.scene)); });
-        awayPositions.forEach((p, idx) => { this.dummies.push(new DummyPlayer(`Away_${p.role}_${idx}`, "away", p.role, p.coords, this.scene)); });
+        homePositions.forEach((p, idx) => { this.dummies.push(new DummyPlayer(`Home_${p.role}_${idx}`, "home", p.role, p.coords, this.scene, this.mats)); });
+        awayPositions.forEach((p, idx) => { this.dummies.push(new DummyPlayer(`Away_${p.role}_${idx}`, "away", p.role, p.coords, this.scene, this.mats)); });
       }
 
       updateCameraFollow() {
         if (!this.player || !this.player.mesh) return;
         const playerPos = this.player.mesh.position;
-        
-        let targetCameraX = playerPos.x + 90; 
-        let targetCameraZ = playerPos.z;      
+        let targetCameraX = playerPos.x + 110; let targetCameraZ = playerPos.z;      
         
         if (this.cameraShakeIntensity > 0.05) {
-          targetCameraX += BABYLON.Scalar.RandomRange(-this.cameraShakeIntensity, this.cameraShakeIntensity) * 15;
-          targetCameraZ += BABYLON.Scalar.RandomRange(-this.cameraShakeIntensity, this.cameraShakeIntensity) * 15;
-          this.cameraShakeIntensity *= 0.88; 
+          targetCameraX += BABYLON.Scalar.RandomRange(-this.cameraShakeIntensity, this.cameraShakeIntensity) * 12;
+          targetCameraZ += BABYLON.Scalar.RandomRange(-this.cameraShakeIntensity, this.cameraShakeIntensity) * 12;
+          this.cameraShakeIntensity *= 0.92; 
         }
-
-        this.camera.position.x = BABYLON.Scalar.Lerp(this.camera.position.x, targetCameraX, 0.07);
-        this.camera.position.z = BABYLON.Scalar.Lerp(this.camera.position.z, targetCameraZ, 0.07);
-        this.camera.position.y = BABYLON.Scalar.Lerp(this.camera.position.y, 45, 0.07);
-        this.camera.setTarget(new Vector3(playerPos.x, playerPos.y + 2.0, playerPos.z));
+        this.camera.position.x = BABYLON.Scalar.Lerp(this.camera.position.x, targetCameraX, 0.06);
+        this.camera.position.z = BABYLON.Scalar.Lerp(this.camera.position.z, targetCameraZ, 0.06);
+        this.camera.position.y = BABYLON.Scalar.Lerp(this.camera.position.y, 75, 0.06);
+        this.camera.setTarget(new Vector3(playerPos.x, playerPos.y + 3.0, playerPos.z));
       }
 
       createProceduralGrassField() {
-        const grassTexture = new DynamicTexture("grassTex", {width: 1024, height: 2048}, this.scene); const ctx = grassTexture.getContext();
-        for (let i = 0; i < 26; i++) { ctx.fillStyle = (i % 2 === 0) ? "#276e2a" : "#2e7d32"; ctx.fillRect(0, i * (2048/26), 1024, (2048/26)); }
-        ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 14; ctx.strokeRect(20, 20, 1024 - 40, 2048 - 40);
-        ctx.beginPath(); ctx.moveTo(20, 1024); ctx.lineTo(1024-20, 1024); ctx.stroke();
-        ctx.beginPath(); ctx.arc(512, 1024, 160, 0, 2 * Math.PI); ctx.stroke(); grassTexture.update();
+        const grassTexture = new DynamicTexture("grassTex", {width: 2048, height: 2048}, this.scene); const ctx = grassTexture.getContext();
+        for (let i = 0; i < 30; i++) { ctx.fillStyle = (i % 2 === 0) ? "#2e7d32" : "#388e3c"; ctx.fillRect(0, i * (2048/30), 2048, (2048/30)); }
+        ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 16; ctx.strokeRect(30, 30, 2048 - 60, 2048 - 60);
+        ctx.beginPath(); ctx.moveTo(30, 1024); ctx.lineTo(2048-30, 1024); ctx.stroke();
+        ctx.beginPath(); ctx.arc(1024, 1024, 250, 0, 2 * Math.PI); ctx.stroke(); grassTexture.update();
         const field = MeshBuilder.CreateGround("soccerField", { width: this.fieldWidth, height: this.fieldHeight }, this.scene);
         const fieldMat = new StandardMaterial("fieldMat", this.scene); fieldMat.diffuseTexture = grassTexture; field.material = fieldMat;
       }
 
       createRealGoals() {
-        this.goalW = 26; this.goalH = 8.0; this.goalD = 6.0; 
-        this.createNetStructure(0, this.fieldHeight/2, this.goalW, this.goalH, this.goalD, true);  
-        this.createNetStructure(0, -this.fieldHeight/2, this.goalW, this.goalH, this.goalD, false); 
+        this.goalW = 46; this.goalH = 13.0; this.goalD = 8.0; 
+        this.createNetStructure(0, this.fieldHeight/2, this.goalW, this.goalH, this.goalD);  
+        this.createNetStructure(0, -this.fieldHeight/2, this.goalW, this.goalH, this.goalD); 
       }
 
-      createNetStructure(x, z, w, h, d, isAwayGoal) {
+      createNetStructure(x, z, w, h, d) {
         const whiteMat = new StandardMaterial("whiteMat", this.scene); whiteMat.diffuseColor = new Color3(0.95, 0.95, 0.95);
-        const leftPost = MeshBuilder.CreateCylinder("postL", { height: h, diameter: 0.4 }, this.scene); leftPost.position.set(x - w/2, h/2, z); leftPost.material = whiteMat;
-        const rightPost = MeshBuilder.CreateCylinder("postR", { height: h, diameter: 0.4 }, this.scene); rightPost.position.set(x + w/2, h/2, z); rightPost.material = whiteMat;
-        const topBar = MeshBuilder.CreateCylinder("barT", { height: w, diameter: 0.4 }, this.scene); topBar.position.set(x, h, z); topBar.rotation.z = Math.PI / 2; topBar.material = whiteMat;
+        const leftPost = MeshBuilder.CreateCylinder("postL", { height: h, diameter: 0.8 }, this.scene); leftPost.position.set(x - w/2, h/2, z); leftPost.material = whiteMat;
+        const rightPost = MeshBuilder.CreateCylinder("postR", { height: h, diameter: 0.8 }, this.scene); rightPost.position.set(x + w/2, h/2, z); rightPost.material = whiteMat;
+        const topBar = MeshBuilder.CreateCylinder("barT", { height: w, diameter: 0.8 }, this.scene); topBar.position.set(x, h, z); topBar.rotation.z = Math.PI / 2; topBar.material = whiteMat;
       }
 
       createBall() {
@@ -628,264 +569,128 @@
       resetBall() { this.ball.position.set(0, BALL_RADIUS, 0); this.ballVelocity.set(0, 0, 0); }
 
       triggerGoal(isAwayGoal) {
-        if (this.isResetting) return; this.isResetting = true; this.player.hasBall = false;
-        this.dummies.forEach(d => d.hasBall = false);
+        if (this.isResetting) return; this.isResetting = true; 
+        this.player.hasBall = false; this.dummies.forEach(d => d.hasBall = false);
         if (isAwayGoal) { this.scoreHome++; document.getElementById("score-home").innerText = this.scoreHome; }
         else { this.scoreAway++; document.getElementById("score-away").innerText = this.scoreAway; }
         const overlay = document.getElementById("goal-overlay"); overlay.style.display = "block";
-        this.cameraShakeIntensity = 1.5;
+        this.cameraShakeIntensity = 2.2;
         setTimeout(() => { this.resetBall(); this.player.resetPosition(); overlay.style.display = "none"; this.isResetting = false; }, 2000);
       }
 
-      // [개선 기능 3]: 정교한 전술형 알고리즘 기반 패스 시스템 (유저 및 상대 AI 공용)
       executePassSystem(passer) {
-        let potentialTargets = [];
-        
-        // 유저 패스 타겟팅 필터링
-        if (passer === this.player) {
-          potentialTargets = this.dummies.filter(d => d.team === "home");
-        } else {
-          // 상대팀 AI 패스 타겟팅 필터링 (자신 제외 원정팀 필드 멤버들)
-          potentialTargets = this.dummies.filter(d => d.team === passer.team && d !== passer && d.role !== "GK");
-        }
-
+        let potentialTargets = (passer === this.player) ? this.dummies.filter(d => d.team === "home") : this.dummies.filter(d => d.team === passer.team && d !== passer && d.role !== "GK");
         if (potentialTargets.length === 0) return false;
 
-        let bestTarget = null;
-        let minAngleDifference = Infinity;
-
-        // 패스 시전자(passer)의 정면 시선 방향 벡터
+        let bestTarget = null; let minAngleDifference = Infinity;
         const passerForward = passer.moveDirection.normalize();
 
         potentialTargets.forEach(target => {
-          // 시전자로부터 팀 동료 선수로 향하는 방향 벡터 계산
-          const toTargetVec = target.mesh.position.subtract(passer.mesh.position);
-          toTargetVec.y = 0; // 평면 계산 보정
+          const toTargetVec = target.mesh.position.subtract(passer.mesh.position); toTargetVec.y = 0;
           const distance = toTargetVec.length();
-
-          if (distance > 1.5 && distance < 65.0) { // 패스 유효 가시거리 체크
+          if (distance > 4.0 && distance < 120.0) {
             toTargetVec.normalize();
-            
-            // 두 벡터 사잇각 차이 판별 (내적 원리 응용)
             const dotProduct = Vector3.Dot(passerForward, toTargetVec);
             const angleDiff = Math.acos(BABYLON.Scalar.Clamp(dotProduct, -1, 1));
-
-            if (angleDiff < minAngleDifference) {
-              minAngleDifference = angleDiff;
-              bestTarget = target;
+            if (angleDiff < minAngleDifference && angleDiff < Math.PI / 3) {
+              minAngleDifference = angleDiff; bestTarget = target;
             }
           }
         });
 
-        // 가장 정렬 상태가 매끄러운 최적의 동료 방향으로 물리 구체 패싱 발사
-        if (bestTarget && minAngleDifference < Math.PI * 0.5) { // 전방 90도 시야각 제한
-          passer.hasBall = false;
-          
-          const passDirection = bestTarget.mesh.position.subtract(passer.mesh.position).normalize();
-          const targetDist = Vector3.Distance(passer.mesh.position, bestTarget.mesh.position);
-          
-          // 거리에 대응하는 탄성 속도 가중치 보정 계산
-          const passVelocityFactor = BABYLON.Scalar.Clamp(targetDist * 0.065, 2.2, 4.2);
-          
-          this.ballVelocity.copyFrom(passDirection.scale(passVelocityFactor));
-          this.ballVelocity.y = 0.05; // 잔디 스치듯 깔아 차는 궤적 패스
-
-          // 가로채기 공백 방지용 주인 지정 초기화
-          this.ball.position.copyFrom(passer.mesh.position.add(passDirection.scale(2.2)));
+        if (bestTarget) {
+          const passDir = bestTarget.mesh.position.subtract(passer.mesh.position).normalize();
+          this.ballVelocity.copyFrom(passDir.scale(4.8)); passer.hasBall = false;
           return true;
         }
         return false;
       }
 
-      handleHardPhysicsCollisions() {
-        const pPos = this.player.mesh.position;
-        
-        this.dummies.forEach(dummy => {
-          const dPos = dummy.mesh.position; const dist = Vector3.Distance(pPos, dPos); const minDist = PLAYER_RADIUS + PLAYER_RADIUS;
-          if (dist < minDist) { pPos.addInPlace(pPos.subtract(dPos).normalize().scale((minDist - dist) * 0.5)); }
-        });
-
-        for (let i = 0; i < this.dummies.length; i++) {
-          for (let j = i + 1; j < this.dummies.length; j++) {
-            const d1 = this.dummies[i].mesh.position;
-            const d2 = this.dummies[j].mesh.position;
-            const distBetweenDummies = Vector3.Distance(d1, d2);
-            const safeDistance = 2.4; 
-
-            if (distBetweenDummies < safeDistance && distBetweenDummies > 0.01) {
-              const pushDirection = d1.subtract(d2).normalize();
-              const overlapAmount = (safeDistance - distBetweenDummies) * 0.5;
-              
-              d1.addInPlace(pushDirection.scale(overlapAmount));
-              d2.addInPlace(pushDirection.scale(-overlapAmount));
-            }
-          }
-        }
-
-        let anyAiHasBall = this.dummies.some(d => d.hasBall);
-        if (!this.player.hasBall && !anyAiHasBall) {
-          const bPos = this.ball.position;
-          this.dummies.forEach(dummy => {
-            const dPos = dummy.mesh.position; const distToBall = Vector3.Distance(bPos, dPos); const collisionDist = PLAYER_RADIUS + BALL_RADIUS;
-            if (distToBall < collisionDist) {
-              const reflectionNormal = bPos.subtract(dPos).normalize();
-              bPos.addInPlace(reflectionNormal.scale(collisionDist - distToBall)); 
-              const speed = this.ballVelocity.length();
-              this.ballVelocity.copyFrom(reflectionNormal.scale(Math.max(speed * 0.78, 0.2))); this.ballVelocity.y = speed * 0.25; 
-            }
-          });
-        }
+      executeUserShoot() {
+        this.isChargingShoot = false; document.getElementById("power-bar-container").style.display = "none";
+        const enemyGoalPos = new Vector3(0, BALL_RADIUS, 160);
+        const shootDir = enemyGoalPos.subtract(this.player.mesh.position).normalize();
+        const finalPower = Math.min(this.shootPowerMax, this.shootPowerCurrent);
+        this.ballVelocity.copyFrom(shootDir.scale(finalPower)); this.ballVelocity.y = finalPower * 0.15;
+        this.player.hasBall = false; this.shootPowerCurrent = 1.0;
       }
 
-      processBallPhysics() {
-        if (this.isResetting) return;
-
-        let aiHasBall = false;
-        this.dummies.forEach(d => { 
-          if(d.hasBall) { 
-            aiHasBall = true; 
-            const forwardX = Math.sin(d.mesh.rotation.y);
-            const forwardZ = Math.cos(d.mesh.rotation.y);
-            this.ball.position.copyFrom(d.mesh.position.add(new Vector3(forwardX * 1.5, BALL_RADIUS, forwardZ * 1.5))); 
-          } 
-        });
-
-        if (this.player.hasBall) {
-          const offset = this.player.moveDirection.scale(1.9);
-          this.ball.position.x = this.player.mesh.position.x + offset.x;
-          this.ball.position.z = this.player.mesh.position.z + offset.z;
-          this.ball.position.y = BALL_RADIUS; this.ballVelocity.set(0, 0, 0);
-        } else if (!aiHasBall) {
-          this.ball.position.addInPlace(this.ballVelocity);
-          if (this.ball.position.y > BALL_RADIUS) this.ballVelocity.y -= this.gravity;
-          else { this.ball.position.y = BALL_RADIUS; this.ballVelocity.y = 0; this.ballVelocity.x *= this.friction; this.ballVelocity.z *= this.friction; }
-
-          const currentZ = this.ball.position.z; const halfH = this.fieldHeight / 2;
-          if (Math.abs(currentZ) >= halfH - 0.5) {
-            if (this.ball.position.x >= -this.goalW/2 && this.ball.position.x <= this.goalW/2) {
-              if (this.ball.position.y <= this.goalH + 0.3) { this.triggerGoal(currentZ > 0); return; }
-            }
+      executeUserTackle() {
+        const awayPlayers = this.dummies.filter(d => d.team === "away" && d.hasBall);
+        if(awayPlayers.length > 0) {
+          const targetAI = awayPlayers[0];
+          if(Vector3.Distance(this.player.mesh.position, targetAI.mesh.position) < 6.0) {
+            if(Math.random() < 0.65) { targetAI.hasBall = false; this.player.hasBall = true; }
           }
-
-          const borderX = (this.fieldWidth / 2) - BALL_RADIUS; const borderZ = (this.fieldHeight / 2) - BALL_RADIUS;
-          let isOut = false;
-          if (Math.abs(this.ball.position.x) > borderX) { this.ball.position.x = Math.sign(this.ball.position.x) * (borderX - 1.5); isOut = true; }
-          if (Math.abs(this.ball.position.z) > borderZ) { if (this.ball.position.x < -this.goalW/2 || this.ball.position.x > this.goalW/2) { this.ball.position.z = Math.sign(this.ball.position.z) * (borderZ - 1.5); isOut = true; } }
-          
-          if (isOut) { 
-            this.ballVelocity.set(0, 0, 0); 
-            this.ball.position.set(0, BALL_RADIUS, 0); 
-            this.player.resetPosition();
-          }
-        }
-      }
-
-      // [복원 및 연동부]: 잘렸던 복구 루틴 완성 및 패스 루프 조립
-      checkCollisionsAndActions() {
-        if (this.isResetting) return;
-
-        const playerPos = this.player.mesh.position;
-        const ballPos = this.ball.position;
-        const distance = Vector3.Distance(playerPos, ballPos);
-
-        let anyAiHasBall = this.dummies.some(d => d.hasBall);
-        
-        // 1. 루즈볼 상황 유저 획득 연산
-        if (!this.player.hasBall && !anyAiHasBall && distance < 2.3 && this.ball.position.y < 2.5) {
-          this.player.hasBall = true;
-        }
-
-        // 2. 유저 공 소유 시 D키 슈팅 기믹 핸들링 (기존 기능 완전 복원)
-        if (this.player.hasBall) {
-          if (this.player.inputMap["d"]) { 
-            this.isChargingShoot = true;
-            document.getElementById("power-bar-container").style.display = "block";
-            this.shootPowerCurrent = Math.min(this.shootPowerMax, this.shootPowerCurrent + 0.12);
-            document.getElementById("power-bar").style.width = ((this.shootPowerCurrent / this.shootPowerMax) * 100) + "%";
-          } else {
-            if (this.isChargingShoot) {
-              // 슛 발사!
-              this.player.hasBall = false;
-              this.isChargingShoot = false;
-              document.getElementById("power-bar-container").style.display = "none";
-              
-              const shootDir = this.player.moveDirection.normalize();
-              this.ballVelocity.copyFrom(shootDir.scale(this.shootPowerCurrent));
-              this.ballVelocity.y = this.shootPowerCurrent * 0.15; // 상향 가속도 유도
-              this.shootPowerCurrent = 1.0;
-            }
-          }
-        }
-
-        // 3. 아군 수비 시 스페이스바 가로채기 액션 스위치
-        if (!this.player.hasBall && anyAiHasBall && this.player.inputMap[" "]) {
-          this.dummies.forEach(d => {
-            if (d.hasBall && Vector3.Distance(playerPos, d.mesh.position) < 3.2) {
-              d.hasBall = false;
-              this.player.hasBall = true;
-              this.player.inputMap[" "] = false; // 일회성 차단 토글화
-            }
-          });
         }
       }
 
       setupMainLoop() {
-        // 공과 가장 근접한 압박 수비수 1명을 선정하는 알고리즘
-        const findClosestDefender = () => {
-          let closestDist = Infinity;
-          let closestDummy = null;
-          const ballPos = this.ball.position;
+        this.engine.runRenderLoop(() => {
+          this.player.update(this.fieldWidth, this.fieldHeight);
 
+          if (this.isChargingShoot) {
+            this.shootPowerCurrent += 0.22;
+            const percentage = Math.min(100, (this.shootPowerCurrent / this.shootPowerMax) * 100);
+            document.getElementById("power-bar").style.width = percentage + "%";
+          }
+
+          let closestAwayDefender = null; let minAwayDist = Infinity;
           this.dummies.forEach(d => {
-            if (d.team === "away" && d.role !== "GK") {
-              const dist = Vector3.Distance(d.mesh.position, ballPos);
-              if (dist < closestDist) {
-                closestDist = dist;
-                closestDummy = d;
-              }
+            if (d.team === "away") {
+              const dist = Vector3.Distance(d.mesh.position, this.ball.position);
+              if (dist < minAwayDist) { minAwayDist = dist; closestAwayDefender = d; }
             }
           });
-          return closestDummy;
-        };
 
-        // 태클 성공 시 볼 오너쉽 체인징 핸들러
-        const onTackleSuccess = (tackler) => {
-          this.player.hasBall = false;
-          this.dummies.forEach(d => d.hasBall = false);
-          tackler.hasBall = true;
-        };
-
-        // 바빌론 프레임 가동 핸들러 연동
-        this.engine.runRenderLoop(() => {
-          const closestDefender = findClosestDefender();
-
-          // 1. 물리 코어 및 조작 업데이트
-          this.player.update(this.fieldWidth, this.fieldHeight);
-          
-          this.dummies.forEach(dummy => {
-            const isClosest = (dummy === closestDefender);
-            dummy.updateAI(this.player, this.ball, this.fieldHeight, isClosest, onTackleSuccess);
+          this.dummies.forEach(d => {
+            d.updateAI(this.player, this.ball, this.fieldHeight, (d === closestAwayDefender), (tackler) => {
+              this.player.hasBall = false; this.dummies.forEach(dm => dm.hasBall = false); tackler.hasBall = true;
+            });
           });
 
-          // 2. 물리 충돌 및 구체 거동 백엔드 처리
-          this.handleHardPhysicsCollisions();
-          this.processBallPhysics();
-          this.checkCollisionsAndActions();
+          // 물리 추적 핸들러 스냅 고정 연동
+          let possessor = this.player.hasBall ? this.player : this.dummies.find(d => d.hasBall);
+          if (possessor) {
+            const forwardOffset = possessor.moveDirection.normalize().scale(2.2);
+            const targetBallPos = possessor.mesh.position.add(forwardOffset); targetBallPos.y = BALL_RADIUS;
+            this.ball.position.copyFrom(targetBallPos); this.ballVelocity.set(0, 0, 0);
+          } else {
+            this.ballVelocity.x *= this.friction; this.ballVelocity.z *= this.friction;
+            if (this.ball.position.y > BALL_RADIUS) this.ballVelocity.y -= this.gravity;
+            this.ball.position.addInPlace(this.ballVelocity);
 
-          // 3. 연출 및 렌더링
+            if (this.ball.position.y < BALL_RADIUS) { this.ball.position.y = BALL_RADIUS; this.ballVelocity.y = -this.ballVelocity.y * 0.35; }
+
+            // 루즈볼 충돌 범위 스케일 업 보정
+            if (Vector3.Distance(this.player.mesh.position, this.ball.position) < 3.8 && !this.isResetting) {
+              this.player.hasBall = true;
+            } else {
+              for (let d of this.dummies) {
+                if (Vector3.Distance(d.mesh.position, this.ball.position) < 3.8 && !this.isResetting) { d.hasBall = true; break; }
+              }
+            }
+          }
+
+          const halfW = this.fieldWidth / 2; const halfH = this.fieldHeight / 2;
+          if (Math.abs(this.ball.position.x) > halfW) { this.ballVelocity.x *= -0.8; this.ball.position.x = Math.sign(this.ball.position.x) * halfW; }
+
+          if (Math.abs(this.ball.position.z) > halfH) {
+            if (Math.abs(this.ball.position.x) < this.goalW / 2 && this.ball.position.y <= this.goalH) {
+              this.triggerGoal(this.ball.position.z > 0);
+            } else {
+              this.ballVelocity.z *= -0.8; this.ball.position.z = Math.sign(this.ball.position.z) * halfH;
+            }
+          }
+
           this.updateCameraFollow();
           this.scene.render();
         });
-
         window.addEventListener("resize", () => { this.engine.resize(); });
       }
     }
 
-    // 게임 인스턴스 전동 실행 부팅
-    window.addEventListener("DOMContentLoaded", () => {
-      const canvas = document.getElementById("renderCanvas");
-      new Game(canvas);
-    });
+    window.addEventListener('DOMContentLoaded', () => { new Game(document.getElementById('renderCanvas')); });
   </script>
 </body>
 </html>
