@@ -81,11 +81,6 @@
       display: none;
       pointer-events: none;
       z-index: 20;
-      animation: pop 0.4s ease-in-out infinite alternate;
-    }
-    @keyframes pop {
-      from { transform: translate(-50%, -50%) scale(0.95); }
-      to { transform: translate(-50%, -50%) scale(1.05); }
     }
     .highlight { color: #ff3333; font-weight: bold; }
     .system-ready { color: #4caf50; font-weight: bold; }
@@ -95,9 +90,9 @@
 <body>
 
   <div id="ui-container">
-    ⚽ <b>리얼리스틱 11v11 전술 매치 시스템 (v4.1)</b><br>
-    • 스케일: <span class="system-ready">경기장 및 선수 크기 대폭 상향</span><br>
-    • 템포: 무작정 뛰는 속도 조절, 리얼한 전술 빌드업 페이스<br>
+    ⚽ <b>리얼리스틱 11v11 전술 매치 시스템 (v4.2)</b><br>
+    • 스케일: 경기장 및 선수 크기 대폭 상향 적용<br>
+    • 템포: 리얼한 전술 빌드업 페이스 (속도 하향)<br>
     • 조작: 화살표 키 / E (대시) / D (D슛 차징) / <span class="highlight">S (정면 아군 패스)</span><br>
     • 수비: 상대 마크맨 근접 시 <span class="system-ready">Spacebar</span> 연타로 밀착 태클 가로채기
     <div id="power-bar-container">
@@ -116,7 +111,7 @@
   <canvas id="renderCanvas"></canvas>
 
   <script>
-    // 네임스페이스 안전성 보장 (일부 브라우저 모듈 스코프 에러 수정)
+    // 네임스페이스 수동 바인딩
     const Engine = BABYLON.Engine;
     const Scene = BABYLON.Scene;
     const FreeCamera = BABYLON.FreeCamera;
@@ -126,11 +121,8 @@
     const MeshBuilder = BABYLON.MeshBuilder;
     const StandardMaterial = BABYLON.StandardMaterial;
     const Color3 = BABYLON.Color3;
-    const DynamicTexture = BABYLON.DynamicTexture;
 
-    // ==========================================
-    // 대폭 상향된 월드 스케일 상수 설정
-    // ==========================================
+    // 대폭 상향된 현실적 축척 스케일
     const PLAYER_SCALE = 2.4; 
     const BALL_RADIUS = 0.95;  
     const PENALTY_BOX_W = 120; 
@@ -138,7 +130,7 @@
 
     let gameInstance = null;
 
-    // 인체 구조화 소재(Material) 캐싱 및 통합 관리
+    // 단색 솔리드 전용 재질 맵 (에러 발생 확률 0%)
     function createHumanMaterials(scene) {
       const mats = {};
       mats.skin = new StandardMaterial("skin", scene); mats.skin.diffuseColor = new Color3(0.95, 0.79, 0.69);
@@ -146,38 +138,24 @@
       mats.eyes = new StandardMaterial("eyes", scene); mats.eyes.diffuseColor = new Color3(0.1, 0.1, 0.1);
       mats.socks = new StandardMaterial("socks", scene); mats.socks.diffuseColor = new Color3(0.95, 0.95, 0.95);
       mats.boots = new StandardMaterial("boots", scene); mats.boots.diffuseColor = new Color3(0.1, 0.1, 0.1);
-      mats.gkHome = new StandardMaterial("gkHome", scene); mats.gkHome.diffuseColor = new Color3(0.8, 0.85, 0.1);
-      mats.gkAway = new StandardMaterial("gkAway", scene); mats.gkAway.diffuseColor = new Color3(0.6, 0.1, 0.6);
-
-      // 홈 유니폼 - 세련된 네이비 스트라이프 텍스처 생성
-      const texHome = new DynamicTexture("texHome", {width:256, height:256}, scene);
-      const ctxH = texHome.getContext();
-      ctxH.fillStyle = "#1976d2"; ctxH.fillRect(0,0,256,256);
-      ctxH.fillStyle = "#0d47a1"; 
-      for(let i=0; i<4; i++) { ctxH.fillRect(i*64, 0, 32, 256); }
-      texHome.update();
-      mats.jerseyHome = new StandardMaterial("jHome", scene); mats.jerseyHome.diffuseTexture = texHome;
+      
+      mats.jerseyHome = new StandardMaterial("jHome", scene); mats.jerseyHome.diffuseColor = new Color3(0.1, 0.3, 0.8); // 네이비 블루
       mats.pantsHome = new StandardMaterial("pHome", scene); mats.pantsHome.diffuseColor = new Color3(0.15, 0.15, 0.15);
 
-      // 원정 유니폼 - 강렬한 레드 스트라이프 텍스처 생성
-      const texAway = new DynamicTexture("texAway", {width:256, height:256}, scene);
-      const ctxA = texAway.getContext();
-      ctxA.fillStyle = "#d32f2f"; ctxA.fillRect(0,0,256,256);
-      ctxA.fillStyle = "#b71c1c"; 
-      for(let i=0; i<4; i++) { ctxA.fillRect(i*64, 0, 32, 256); }
-      texAway.update();
-      mats.jerseyAway = new StandardMaterial("jAway", scene); mats.jerseyAway.diffuseTexture = texAway;
+      mats.jerseyAway = new StandardMaterial("jAway", scene); mats.jerseyAway.diffuseColor = new Color3(0.8, 0.1, 0.1); // 레드
       mats.pantsAway = new StandardMaterial("pAway", scene); mats.pantsAway.diffuseColor = new Color3(0.9, 0.9, 0.9);
+
+      mats.gkHome = new StandardMaterial("gkHome", scene); mats.gkHome.diffuseColor = new Color3(0.8, 0.85, 0.1);
+      mats.gkAway = new StandardMaterial("gkAway", scene); mats.gkAway.diffuseColor = new Color3(0.6, 0.1, 0.6);
 
       return mats;
     }
 
-    // 디테일한 사람 형태(Humanoid Mesh) 구조 빌더
+    // 디테일한 사람 형태(Humanoid Mesh) 빌더
     function buildRealisticHumanoid(mesh, isHome, isGK, mats, scene) {
       const jerseyMat = isGK ? (isHome ? mats.gkHome : mats.gkAway) : (isHome ? mats.jerseyHome : mats.jerseyAway);
       const pantsMat = isHome ? mats.pantsHome : mats.pantsAway;
 
-      // 전체 크기 스케일 업 적용
       mesh.scaling.set(PLAYER_SCALE, PLAYER_SCALE, PLAYER_SCALE);
 
       // 1. 몸통 (Torso)
@@ -227,7 +205,6 @@
         this.mats = mats;
         this.team = "home";
         
-        // 현실적인 움직임을 위한 하향 조정된 전술 속도 밸런싱
         this.minSpeed = 0.16;     
         this.maxSpeed = 0.32;     
         this.currentSpeed = 0.16;  
@@ -292,7 +269,6 @@
           this.moveDirection.copyFrom(inputDir);
           this.mesh.rotation.y = Math.atan2(inputDir.x, inputDir.z);
 
-          // 다이나믹 사람 형태 관절 주행 애니메이션
           const time = performance.now() * this.currentSpeed * 0.15;
           this.anims.leftLegRoot.rotation.x = Math.sin(time) * 0.7;
           this.anims.rightLegRoot.rotation.x = -Math.sin(time) * 0.7;
@@ -324,7 +300,6 @@
         this.scene = scene;
         this.mats = mats;
         
-        // 현실적 경기 흐름을 위해 속도 체감 하향 조정
         this.baseSpeed = 0.13;
         this.dashSpeed = 0.22; 
         this.gkSpeed = 0.18; 
@@ -487,8 +462,7 @@
         this.mats = createHumanMaterials(this.scene);
 
         this.initScene();
-        this.createProceduralGrassField();
-        this.createGKZoneBoxes(); 
+        this.createSolidGrassField(); // 차단 원인이 되는 드로잉 연산 우회
         this.createRealGoals();
         this.createBall();
         this.player = new Player(this.scene, this.mats);
@@ -502,14 +476,8 @@
         this.scene.clearColor = new Color3(0.53, 0.81, 0.92);
         this.camera = new FreeCamera("mainTacticalCamera", new Vector3(120, 80, 0), this.scene);
         this.camera.setTarget(new Vector3(0, 0, 0)); 
-        this.light = new HemisphericLight("skyLight", new Vector3(0, 1, 0), this.scene); this.light.intensity = 0.75;
+        this.light = new HemisphericLight("skyLight", new Vector3(0, 1, 0), this.scene); this.light.intensity = 0.85;
         const sunLight = new DirectionalLight("sunLight", new Vector3(-1, -2, -0.4), this.scene); sunLight.intensity = 0.95;
-      }
-
-      createGKZoneBoxes() {
-        const zoneMat = new StandardMaterial("gkZoneMat", this.scene); zoneMat.diffuseColor = new Color3(1, 0.3, 0); zoneMat.alpha = 0.015; 
-        this.awayGKBox = MeshBuilder.CreateBox("awayGKBox", { width: PENALTY_BOX_W, height: 0.1, depth: PENALTY_BOX_D }, this.scene);
-        this.awayGKBox.position.set(0, 0.05, (this.fieldHeight / 2) - (PENALTY_BOX_D / 2)); this.awayGKBox.material = zoneMat;
       }
 
       spawnFormationDummies() {
@@ -548,14 +516,12 @@
         this.camera.setTarget(new Vector3(playerPos.x, playerPos.y + 3.0, playerPos.z));
       }
 
-      createProceduralGrassField() {
-        const grassTexture = new DynamicTexture("grassTex", {width: 1024, height: 1024}, this.scene); const ctx = grassTexture.getContext();
-        for (let i = 0; i < 20; i++) { ctx.fillStyle = (i % 2 === 0) ? "#2e7d32" : "#388e3c"; ctx.fillRect(0, i * (1024/20), 1024, (1024/20)); }
-        ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 10; ctx.strokeRect(15, 15, 1024 - 30, 1024 - 30);
-        ctx.beginPath(); ctx.moveTo(15, 512); ctx.lineTo(1024-15, 512); ctx.stroke();
-        ctx.beginPath(); ctx.arc(512, 512, 120, 0, 2 * Math.PI); ctx.stroke(); grassTexture.update();
+      // 안전한 솔리드 컬러 녹색 잔디 필드 생성
+      createSolidGrassField() {
         const field = MeshBuilder.CreateGround("soccerField", { width: this.fieldWidth, height: this.fieldHeight }, this.scene);
-        const fieldMat = new StandardMaterial("fieldMat", this.scene); fieldMat.diffuseTexture = grassTexture; field.material = fieldMat;
+        const fieldMat = new StandardMaterial("fieldMat", this.scene); 
+        fieldMat.diffuseColor = new Color3(0.2, 0.55, 0.25); // 선명한 경기장 녹색
+        field.material = fieldMat;
       }
 
       createRealGoals() {
@@ -698,7 +664,6 @@
       }
     }
 
-    // 파일 로드 즉시 실행 안전 보장
     window.addEventListener('DOMContentLoaded', () => { 
       new Game(document.getElementById('renderCanvas')); 
     });
