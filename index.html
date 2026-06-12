@@ -95,7 +95,7 @@
 <body>
 
   <div id="ui-container">
-    ⚽ <b>리얼리스틱 11v11 전술 매치 시스템 (v4.0)</b><br>
+    ⚽ <b>리얼리스틱 11v11 전술 매치 시스템 (v4.1)</b><br>
     • 스케일: <span class="system-ready">경기장 및 선수 크기 대폭 상향</span><br>
     • 템포: 무작정 뛰는 속도 조절, 리얼한 전술 빌드업 페이스<br>
     • 조작: 화살표 키 / E (대시) / D (D슛 차징) / <span class="highlight">S (정면 아군 패스)</span><br>
@@ -115,14 +115,24 @@
   
   <canvas id="renderCanvas"></canvas>
 
-  <script type="module">
-    const { Engine, Scene, FreeCamera, Vector3, HemisphericLight, DirectionalLight, MeshBuilder, StandardMaterial, Color3, DynamicTexture } = BABYLON;
+  <script>
+    // 네임스페이스 안전성 보장 (일부 브라우저 모듈 스코프 에러 수정)
+    const Engine = BABYLON.Engine;
+    const Scene = BABYLON.Scene;
+    const FreeCamera = BABYLON.FreeCamera;
+    const Vector3 = BABYLON.Vector3;
+    const HemisphericLight = BABYLON.HemisphericLight;
+    const DirectionalLight = BABYLON.DirectionalLight;
+    const MeshBuilder = BABYLON.MeshBuilder;
+    const StandardMaterial = BABYLON.StandardMaterial;
+    const Color3 = BABYLON.Color3;
+    const DynamicTexture = BABYLON.DynamicTexture;
 
     // ==========================================
     // 대폭 상향된 월드 스케일 상수 설정
     // ==========================================
-    const PLAYER_SCALE = 2.4; // 선수의 전반적인 볼륨감 배율 상향
-    const BALL_RADIUS = 0.95;  // 공의 크기 체감 확대
+    const PLAYER_SCALE = 2.4; 
+    const BALL_RADIUS = 0.95;  
     const PENALTY_BOX_W = 120; 
     const PENALTY_BOX_D = 70; 
 
@@ -139,7 +149,7 @@
       mats.gkHome = new StandardMaterial("gkHome", scene); mats.gkHome.diffuseColor = new Color3(0.8, 0.85, 0.1);
       mats.gkAway = new StandardMaterial("gkAway", scene); mats.gkAway.diffuseColor = new Color3(0.6, 0.1, 0.6);
 
-      // 홈 유니폼 - 세련된 네이비 스트라이프 테스처 생성
+      // 홈 유니폼 - 세련된 네이비 스트라이프 텍스처 생성
       const texHome = new DynamicTexture("texHome", {width:256, height:256}, scene);
       const ctxH = texHome.getContext();
       ctxH.fillStyle = "#1976d2"; ctxH.fillRect(0,0,256,256);
@@ -164,42 +174,44 @@
 
     // 디테일한 사람 형태(Humanoid Mesh) 구조 빌더
     function buildRealisticHumanoid(mesh, isHome, isGK, mats, scene) {
-      const jerseyMat = isGK ? (isHome ? mats.gkHome : mats.gkAway) : (isHome ? mats.jerseyHome : mats.jerseyHome);
+      const jerseyMat = isGK ? (isHome ? mats.gkHome : mats.gkAway) : (isHome ? mats.jerseyHome : mats.jerseyAway);
       const pantsMat = isHome ? mats.pantsHome : mats.pantsAway;
-      if (!isHome && !isGK) { jerseyMat.copyFrom(mats.jerseyAway); } // 원정 필드 스킨 바인딩 안전장치
 
-      // 1. 몸통 (Torso) 및 가슴라인 벨런스
-      const torso = MeshBuilder.CreateCylinder("torso", { diameterTop: 1.3, diameterBottom: 0.9, height: 2.2, tessellation: 16 }, scene);
-      torso.position.y = 3.6; torso.scaling.z = 0.75; torso.material = jerseyMat; torso.parent = mesh;
+      // 전체 크기 스케일 업 적용
+      mesh.scaling.set(PLAYER_SCALE, PLAYER_SCALE, PLAYER_SCALE);
 
-      // 2. 머리 (Head)와 얼굴 디테일 요소 추가
-      const neck = MeshBuilder.CreateCylinder("neck", { diameter: 0.45, height: 0.4 }, scene); neck.position.y = 4.8; neck.material = mats.skin; neck.parent = mesh;
-      const head = MeshBuilder.CreateSphere("head", { diameterX: 0.85, diameterY: 0.95, diameterZ: 0.85 }, scene); head.position.y = 5.4; head.material = mats.skin; head.parent = mesh;
+      // 1. 몸통 (Torso)
+      const torso = MeshBuilder.CreateCylinder("torso", { diameterTop: 0.6, diameterBottom: 0.4, height: 1.0, tessellation: 12 }, scene);
+      torso.position.y = 1.4; torso.scaling.z = 0.75; torso.material = jerseyMat; torso.parent = mesh;
+
+      // 2. 머리 (Head)와 얼굴 디테일
+      const neck = MeshBuilder.CreateCylinder("neck", { diameter: 0.2, height: 0.15 }, scene); neck.position.y = 1.95; neck.material = mats.skin; neck.parent = mesh;
+      const head = MeshBuilder.CreateSphere("head", { diameterX: 0.4, diameterY: 0.45, diameterZ: 0.4 }, scene); head.position.y = 2.25; head.material = mats.skin; head.parent = mesh;
       
-      const hair = MeshBuilder.CreateSphere("hair", { diameter: 0.88 }, scene); hair.position.set(0, 5.65, -0.05); hair.scaling.set(1.02, 0.7, 1.05); hair.material = mats.hair; hair.parent = mesh;
-      const eyeL = MeshBuilder.CreateSphere("eyeL", { diameter: 0.12 }, scene); eyeL.position.set(-0.18, 5.5, 0.38); eyeL.material = mats.eyes; eyeL.parent = mesh;
-      const eyeR = eyeL.clone("eyeR"); eyeR.position.x = 0.18; eyeR.parent = mesh;
+      const hair = MeshBuilder.CreateSphere("hair", { diameter: 0.42 }, scene); hair.position.set(0, 2.35, -0.02); hair.scaling.set(1.02, 0.7, 1.05); hair.material = mats.hair; hair.parent = mesh;
+      const eyeL = MeshBuilder.CreateSphere("eyeL", { diameter: 0.05 }, scene); eyeL.position.set(-0.08, 2.28, 0.18); eyeL.material = mats.eyes; eyeL.parent = mesh;
+      const eyeR = eyeL.clone("eyeR"); eyeR.position.x = 0.08; eyeR.parent = mesh;
 
       // 3. 골반 및 하체 바지 (Pelvis & Shorts)
-      const pelvis = MeshBuilder.CreateBox("pelvis", { width: 1.1, height: 0.7, depth: 0.8 }, scene); pelvis.position.y = 2.35; pelvis.material = pantsMat; pelvis.parent = mesh;
+      const pelvis = MeshBuilder.CreateBox("pelvis", { width: 0.5, height: 0.3, depth: 0.35 }, scene); pelvis.position.y = 0.85; pelvis.material = pantsMat; pelvis.parent = mesh;
 
       // 4. 애니메이션 연동용 계층 구조 다리 파츠 구성
-      const leftLegRoot = MeshBuilder.CreateBox("L_LegRoot", { size: 0.1 }, scene); leftLegRoot.position.set(-0.35, 2.1, 0); leftLegRoot.parent = mesh; leftLegRoot.isVisible = false;
-      const leftThigh = MeshBuilder.CreateCylinder("L_Thigh", { diameterTop: 0.55, diameterBottom: 0.45, height: 1.1 }, scene); leftThigh.position.y = -0.5; leftThigh.material = pantsMat; leftThigh.parent = leftLegRoot;
-      const leftCalf = MeshBuilder.CreateCylinder("L_Calf", { diameterTop: 0.42, diameterBottom: 0.3, height: 1.1 }, scene); leftCalf.position.y = -1.5; leftCalf.material = mats.socks; leftCalf.parent = leftLegRoot;
-      const leftFoot = MeshBuilder.CreateBox("L_Foot", { width: 0.35, height: 0.25, depth: 0.7 }, scene); leftFoot.position.set(0, -2.1, 0.15); leftFoot.material = mats.boots; leftFoot.parent = leftLegRoot;
+      const leftLegRoot = MeshBuilder.CreateBox("L_LegRoot", { size: 0.05 }, scene); leftLegRoot.position.set(-0.15, 0.7, 0); leftLegRoot.parent = mesh; leftLegRoot.isVisible = false;
+      const leftThigh = MeshBuilder.CreateCylinder("L_Thigh", { diameterTop: 0.24, diameterBottom: 0.18, height: 0.45 }, scene); leftThigh.position.y = -0.22; leftThigh.material = pantsMat; leftThigh.parent = leftLegRoot;
+      const leftCalf = MeshBuilder.CreateCylinder("L_Calf", { diameterTop: 0.16, diameterBottom: 0.12, height: 0.45 }, scene); leftCalf.position.y = -0.65; leftCalf.material = mats.socks; leftCalf.parent = leftLegRoot;
+      const leftFoot = MeshBuilder.CreateBox("L_Foot", { width: 0.14, height: 0.1, depth: 0.28 }, scene); leftFoot.position.set(0, -0.9, 0.06); leftFoot.material = mats.boots; leftFoot.parent = leftLegRoot;
 
-      const rightLegRoot = MeshBuilder.CreateBox("R_LegRoot", { size: 0.1 }, scene); rightLegRoot.position.set(0.35, 2.1, 0); rightLegRoot.parent = mesh; rightLegRoot.isVisible = false;
+      const rightLegRoot = MeshBuilder.CreateBox("R_LegRoot", { size: 0.05 }, scene); rightLegRoot.position.set(0.15, 0.7, 0); rightLegRoot.parent = mesh; rightLegRoot.isVisible = false;
       const rightThigh = leftThigh.clone("R_Thigh"); rightThigh.parent = rightLegRoot;
       const rightCalf = leftCalf.clone("R_Calf"); rightCalf.parent = rightLegRoot;
       const rightFoot = leftFoot.clone("R_Foot"); rightFoot.parent = rightLegRoot;
 
       // 5. 어깨 및 양팔 파츠 구성
-      const leftArmRoot = MeshBuilder.CreateBox("L_ArmRoot", { size: 0.1 }, scene); leftArmRoot.position.set(-0.85, 4.4, 0); leftArmRoot.parent = mesh; leftArmRoot.isVisible = false;
-      const leftArm = MeshBuilder.CreateCylinder("L_Arm", { diameterTop: 0.35, diameterBottom: 0.28, height: 1.6 }, scene); leftArm.position.y = -0.6; leftArm.material = jerseyMat; leftArm.parent = leftArmRoot;
-      const leftHand = MeshBuilder.CreateSphere("L_Hand", { diameter: 0.28 }, scene); leftHand.position.y = -1.45; leftHand.material = mats.skin; leftHand.parent = leftArmRoot;
+      const leftArmRoot = MeshBuilder.CreateBox("L_ArmRoot", { size: 0.05 }, scene); leftArmRoot.position.set(-0.35, 1.7, 0); leftArmRoot.parent = mesh; leftArmRoot.isVisible = false;
+      const leftArm = MeshBuilder.CreateCylinder("L_Arm", { diameterTop: 0.14, diameterBottom: 0.11, height: 0.6 }, scene); leftArm.position.y = -0.25; leftArm.material = jerseyMat; leftArm.parent = leftArmRoot;
+      const leftHand = MeshBuilder.CreateSphere("L_Hand", { diameter: 0.11 }, scene); leftHand.position.y = -0.58; leftHand.material = mats.skin; leftHand.parent = leftArmRoot;
 
-      const rightArmRoot = MeshBuilder.CreateBox("R_ArmRoot", { size: 0.1 }, scene); rightArmRoot.position.set(0.85, 4.4, 0); rightArmRoot.parent = mesh; rightArmRoot.isVisible = false;
+      const rightArmRoot = MeshBuilder.CreateBox("R_ArmRoot", { size: 0.05 }, scene); rightArmRoot.position.set(0.35, 1.7, 0); rightArmRoot.parent = mesh; rightArmRoot.isVisible = false;
       const rightArm = leftArm.clone("R_Arm"); rightArm.parent = rightArmRoot;
       const rightHand = leftHand.clone("R_Hand"); rightHand.parent = rightArmRoot;
 
@@ -215,10 +227,10 @@
         this.mats = mats;
         this.team = "home";
         
-        // 현실적인 축구 매치 움직임을 위한 속도 하향 밸런싱
-        this.minSpeed = 0.14;     
-        this.maxSpeed = 0.28;     
-        this.currentSpeed = 0.14;  
+        // 현실적인 움직임을 위한 하향 조정된 전술 속도 밸런싱
+        this.minSpeed = 0.16;     
+        this.maxSpeed = 0.32;     
+        this.currentSpeed = 0.16;  
         this.acceleration = 0.008; 
         
         this.inputMap = {};
@@ -280,7 +292,7 @@
           this.moveDirection.copyFrom(inputDir);
           this.mesh.rotation.y = Math.atan2(inputDir.x, inputDir.z);
 
-          // 다이나믹 사람 형태 관절 주행 애니메이션 계산
+          // 다이나믹 사람 형태 관절 주행 애니메이션
           const time = performance.now() * this.currentSpeed * 0.15;
           this.anims.leftLegRoot.rotation.x = Math.sin(time) * 0.7;
           this.anims.rightLegRoot.rotation.x = -Math.sin(time) * 0.7;
@@ -312,10 +324,10 @@
         this.scene = scene;
         this.mats = mats;
         
-        // 현실적 경기 흐름을 위해 AI 스피드 균형 하향 조정
-        this.baseSpeed = 0.11;
-        this.dashSpeed = 0.19; 
-        this.gkSpeed = 0.16; 
+        // 현실적 경기 흐름을 위해 속도 체감 하향 조정
+        this.baseSpeed = 0.13;
+        this.dashSpeed = 0.22; 
+        this.gkSpeed = 0.18; 
         this.hasBall = false;
         this.zoneRadius = 65.0; 
 
@@ -405,7 +417,6 @@
           return;
         }
 
-        // 라인 유지 및 수비 대형 전환 시퀀스
         let teamHasBall = gameInstance ? gameInstance.dummies.some(d => d.team === this.team && d.hasBall) : false;
         if (teamHasBall) {
           let supportTarget = this.initialPos.clone();
@@ -422,8 +433,9 @@
         const distFromBaseToBall = Vector3.Distance(this.initialPos, ballPos);
         const trackTargetPos = playerObj.hasBall ? playerPos : ballPos;
 
+        let currentMoveSpeed = this.baseSpeed;
         if (distFromBaseToBall < this.zoneRadius || isClosestDefender) {
-          let currentMoveSpeed = isClosestDefender ? this.dashSpeed : this.baseSpeed;
+          currentMoveSpeed = isClosestDefender ? this.dashSpeed : this.baseSpeed;
           if (isClosestDefender) {
             const leadTime = Vector3.Distance(this.mesh.position, trackTargetPos) * 0.05;
             const interceptOffset = playerObj.hasBall ? playerObj.moveDirection.scale(playerObj.currentSpeed * leadTime * 8) : new Vector3(0,0,0);
@@ -463,7 +475,6 @@
         this.engine = new Engine(this.canvas, true);
         this.scene = new Scene(this.engine);
         
-        // 현실적 축구 전술 비율에 맞춘 초대형 구장 축척 스케일 상향
         this.fieldWidth = 240; this.fieldHeight = 340;
         this.ballVelocity = new Vector3(0, 0, 0);
         this.friction = 0.985; this.gravity = 0.06; this.isResetting = false;
@@ -502,7 +513,6 @@
       }
 
       spawnFormationDummies() {
-        // 초대형 필드 축척에 맞춘 정밀 포지셔닝 타겟팅
         const homePositions = [
           { role: "GK", coords: new Vector3(0, 0, -160) }, 
           { role: "FIELD", coords: new Vector3(-75, 0, -100) }, { role: "FIELD", coords: new Vector3(-25, 0, -110) },
@@ -539,11 +549,11 @@
       }
 
       createProceduralGrassField() {
-        const grassTexture = new DynamicTexture("grassTex", {width: 2048, height: 2048}, this.scene); const ctx = grassTexture.getContext();
-        for (let i = 0; i < 30; i++) { ctx.fillStyle = (i % 2 === 0) ? "#2e7d32" : "#388e3c"; ctx.fillRect(0, i * (2048/30), 2048, (2048/30)); }
-        ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 16; ctx.strokeRect(30, 30, 2048 - 60, 2048 - 60);
-        ctx.beginPath(); ctx.moveTo(30, 1024); ctx.lineTo(2048-30, 1024); ctx.stroke();
-        ctx.beginPath(); ctx.arc(1024, 1024, 250, 0, 2 * Math.PI); ctx.stroke(); grassTexture.update();
+        const grassTexture = new DynamicTexture("grassTex", {width: 1024, height: 1024}, this.scene); const ctx = grassTexture.getContext();
+        for (let i = 0; i < 20; i++) { ctx.fillStyle = (i % 2 === 0) ? "#2e7d32" : "#388e3c"; ctx.fillRect(0, i * (1024/20), 1024, (1024/20)); }
+        ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 10; ctx.strokeRect(15, 15, 1024 - 30, 1024 - 30);
+        ctx.beginPath(); ctx.moveTo(15, 512); ctx.lineTo(1024-15, 512); ctx.stroke();
+        ctx.beginPath(); ctx.arc(512, 512, 120, 0, 2 * Math.PI); ctx.stroke(); grassTexture.update();
         const field = MeshBuilder.CreateGround("soccerField", { width: this.fieldWidth, height: this.fieldHeight }, this.scene);
         const fieldMat = new StandardMaterial("fieldMat", this.scene); fieldMat.diffuseTexture = grassTexture; field.material = fieldMat;
       }
@@ -649,7 +659,6 @@
             });
           });
 
-          // 물리 추적 핸들러 스냅 고정 연동
           let possessor = this.player.hasBall ? this.player : this.dummies.find(d => d.hasBall);
           if (possessor) {
             const forwardOffset = possessor.moveDirection.normalize().scale(2.2);
@@ -662,7 +671,6 @@
 
             if (this.ball.position.y < BALL_RADIUS) { this.ball.position.y = BALL_RADIUS; this.ballVelocity.y = -this.ballVelocity.y * 0.35; }
 
-            // 루즈볼 충돌 범위 스케일 업 보정
             if (Vector3.Distance(this.player.mesh.position, this.ball.position) < 3.8 && !this.isResetting) {
               this.player.hasBall = true;
             } else {
@@ -690,7 +698,10 @@
       }
     }
 
-    window.addEventListener('DOMContentLoaded', () => { new Game(document.getElementById('renderCanvas')); });
+    // 파일 로드 즉시 실행 안전 보장
+    window.addEventListener('DOMContentLoaded', () => { 
+      new Game(document.getElementById('renderCanvas')); 
+    });
   </script>
 </body>
 </html>
